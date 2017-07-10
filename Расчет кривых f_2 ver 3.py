@@ -31,20 +31,14 @@ def find_f(P_pv, Q_acb, data_base):
     return f
     
 def find_P_pv_min():
-    f_data = open('data_pv_min.out', 'r')
-    hours_number = 0
-    E_pv_sum = 0
-    for string in f_data: 
-        if (string.find('+') >= 0):
-            temp = string.split(' ')[4]
-            temp1 = temp[:-2]
-            E_pv_sum += float(temp1)
-            hours_number += 1
-                            
-    #print(round(E_load_sum/(hours_number-1)/3.6, 2))
-    P_pv_min = (hours_number-1)*3.6*200/E_pv_sum
+    fixed_df = pd.read_csv('data_pv_min.out', sep='\t', encoding='latin1')
+    fixed_df.columns = ['Time', 'Power', 'Nan']
+    fixed_df = fixed_df.drop(['Nan'], axis=1)
+    fixed_df = fixed_df.drop(0, axis=0)
+    fixed_df = fixed_df.rename(index = str, columns = {1: 'Power'})      
+
+    P_pv_min = len(fixed_df['Power']) * 3.6 * 200 / float(sum(fixed_df['Power']))
     
-    f_data.close()
     return P_pv_min
 
 def bisection(P, Q, f_wanted):
@@ -67,7 +61,7 @@ def graph(Q, P, f_wanted):
     plt.xlabel(u'Емкость аккумулятора, кДж')
     plt.ylabel(u'Пиковая мощность фэп, кДж/ч')
     plt.legend()
-    plt.show()
+    plt.savefig('For f = ' + str(f_wanted) + '.png')
     
 def graph_df_f(fdf, f):
     df = []
@@ -86,7 +80,8 @@ def graph_df_f(fdf, f):
     plt.xlabel(u'f')
     plt.ylabel(u'df')
     plt.legend()
-    plt.show()
+    #plt.show()
+    plt.savefig('For df.png')
     
 def find_array_f(n, k, P_pv_arr, Q_max, data_base):
     
@@ -101,10 +96,13 @@ def find_array_f(n, k, P_pv_arr, Q_max, data_base):
     f.write('\n')
         
     for i in range(k):
+        print('k = ', k)
         section = []
         f.write("%s;" % Q_arr[i])
         f_1=False
         for j in range(n):
+            print('n = ', n)
+            print('\n')
             if(f_1==False):
                 section.append(round(find_f(P_pv_arr[j], Q_arr[i], data_base),3))
                 if(section[j]==1.0):
@@ -115,57 +113,12 @@ def find_array_f(n, k, P_pv_arr, Q_max, data_base):
         f_arr.append(section)
         f.write('\n')
     
-    
-
     f.close()    
     return f_arr
 
-def main():
-    print('Start')
-    Q = 2000 #емкость аккумулятора
-    Q_min = 100
+def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):    
     Q_last = []
-    P_pv_nom = 200 #пиковая мощность фэп в Ваттах
-    P_pv_arr = []
-    f_wanted = [1.0, 0.95, 0.9, 0.85]
-    n = 36
-    k = 32 
-    f_in_nasa = [[0] * n for i in range(k)]
-    f_in_wrdc = [[0] * n for i in range(k)]
-    delta_f = [[0] * n for i in range(k)]
-    
-    os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project5.dck /h')
-    P_pv_min = find_P_pv_min()  
-    P_pv_arr = []
-    for i in range(n):
-        P_pv_arr.append((0.4+0.2*i)*P_pv_min)
-#        f_arr.append(find_f(P_pv_arr[i],1000))    
-    
-    f = open('Относительная погрешность f.csv', 'w')
-    f.write(";")
-        
-    f_in_nasa = find_array_f(n, k, P_pv_arr, Q, 'NASA')
-    f_in_wrdc = find_array_f(n, k, P_pv_arr, Q, 'WRDC')
-    for i in range(n):    
-        f.write("%s;" % round(P_pv_arr[i], 2))
-    f.write('\n')
-    
-    Q_arr = [i for i in range(5, Q + 1, Q // k)]
-    
-    for i in range(k):
-        f.write("%s;" % Q_arr[i])
-        for j in range(n):
-            delta_f[i][j] = (f_in_nasa[i][j] - f_in_wrdc[i][j])/f_in_wrdc[i][j]
-            f.write("%s;" % round(delta_f[i][j], 3))
-        f.write('\n')
-
-    f.close()
-    
-    print('Finish!')
-    
-    
-    '''
-    dots_number = 5
+    P_pv_arr = []   
     
     Q_arr = [[0] * dots_number for i in range(len(f_wanted))]
     P_pv_arr = [[0] * dots_number for i in range(len(f_wanted))]
@@ -180,7 +133,10 @@ def main():
         
         
     for i in range(dots_number):
+        print('dot #: ', i)
         for j in range(len(f_wanted)):
+            print('f = ', j)
+            print('\n')
             P_pv_arr[j][i] = ( (1+0.2*i)*P_pv_min*f_wanted[j] )
             if f_wanted[j] < 1:
                 result = open('Result_file_for_f_0_' + str(f_wanted[j]*100) + '.txt', 'a')
@@ -194,7 +150,7 @@ def main():
                 print('Расчет ', j)
                 Q = Q_arr[j][i]
                 Q_last.append(Q)
-                f_in_nasa.append([])
+                #f_in_nasa.append([])
             else:
                 Q_arr[j][i] = ( bisection(P_pv_arr[j][i], Q_last[j], f_wanted[j]) )
                 Q_last[j] = Q_arr[j][i]
@@ -209,8 +165,61 @@ def main():
 
     graph(Q_arr, P_pv_arr, f_wanted)
     #graph_df_f(f_in_nasa, f_wanted)
-      
-'''
+    print('Finish!')
+
+def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
+
+    f_in_nasa = [[0] * number_of_lines for i in range(number_of_columns)]
+    f_in_wrdc = [[0] * number_of_lines for i in range(number_of_columns)]
+    delta_f = [[0] * number_of_lines for i in range(number_of_columns)]   
+    
+    print('Start grid\n')
+    
+    P_pv_arr = []
+    for i in range(number_of_lines):
+        P_pv_arr.append((0.4+0.2*i)*P_pv_min)
+#        f_arr.append(find_f(P_pv_arr[i],1000))  
+
+    f = open('Относительная погрешность f.csv', 'w')
+    f.write(";")
+        
+    f_in_nasa = find_array_f(number_of_lines, number_of_columns, P_pv_arr, Q, 'NASA')
+    f_in_wrdc = find_array_f(number_of_lines, number_of_columns, P_pv_arr, Q, 'WRDC')
+    for i in range(number_of_lines):    
+        f.write("%s;" % round(P_pv_arr[i], 2))
+    f.write('\n')
+    
+    Q_arr = [i for i in range(5, Q + 1, Q // number_of_columns)]
+    
+    for i in range(number_of_columns):
+        print('column #: ', i)
+        f.write("%s;" % Q_arr[i])
+        for j in range(number_of_lines):
+            print('line #: ', j)
+            print('\n')
+            delta_f[i][j] = (f_in_nasa[i][j] - f_in_wrdc[i][j])/f_in_wrdc[i][j]
+            f.write("%s;" % round(delta_f[i][j], 3))
+        f.write('\n')
+
+    f.close()
+    
+    print('Finish!')
+
+def main():
+    print('Start')
+    Q = 2000 #емкость аккумулятора
+    P_pv_nom = 200 #пиковая мощность фэп в Ваттах
+    f_wanted = [1.0, 0.95, 0.9, 0.85]
+    number_of_lines = 36
+    number_of_columns = 32 
+    dots_number = 5
+    
+    os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project5.dck /h')
+    P_pv_min = find_P_pv_min()  
+
+    lines_for_different_f(Q, f_wanted, P_pv_min, dots_number)
+    
+    grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns)
     
 main()
 
