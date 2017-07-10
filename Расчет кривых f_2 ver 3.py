@@ -1,6 +1,8 @@
 import os
+import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 
 def in_file(Q_acb, P_pv_max, data_base):
     param_file_name = 'Param_Project2_for_' + data_base + '.txt'
@@ -63,25 +65,27 @@ def graph(Q, P, f_wanted):
     plt.legend()
     plt.savefig('For f = ' + str(f_wanted) + '.png')
     
-def graph_df_f(fdf, f):
-    df = []
-    ddf = []
-    for i in range(len(f)):
-        df_arr = []
-        df_mid_sum = 0
-        for j in range(len(fdf[i])):
-            df_arr.append(abs(f[i] - fdf[i][j]))
-            df_mid_sum += df_arr[j] 
-        df.append(df_mid_sum/len(fdf[i]))
-        ddf.append(max(df_arr))
-    plt.scatter(f, df)
-    plt.errorbar(f, df, yerr = ddf, fmt='.-')
-    plt.grid(True)
-    plt.xlabel(u'f')
-    plt.ylabel(u'df')
-    plt.legend()
-    #plt.show()
-    plt.savefig('For df.png')
+def plot_df(Q_arr, P_pv_arr, delta):    
+    matplotlib.rcParams['xtick.direction'] = 'out'
+    matplotlib.rcParams['ytick.direction'] = 'out'
+    
+    x = Q_arr
+    y = P_pv_arr
+    X, Y = np.meshgrid(x, y)
+    Z = delta
+    
+    
+    # Create a simple contour plot with labels using default colors.  The
+    # inline argument to clabel will control whether the labels are draw
+    # over the line segments of the contour, removing the lines beneath
+    # the label
+    plt.figure()
+    CS = plt.contour(X, Y, Z)
+    plt.clabel(CS, inline=1, fontsize=10)
+    plt.title('Simplest default with labels')
+    
+    plt.savefig('Greed for delta.png')   
+    
     
 def find_array_f(n, k, P_pv_arr, Q_max, data_base):
     
@@ -171,14 +175,13 @@ def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
 
     f_in_nasa = [[0] * number_of_lines for i in range(number_of_columns)]
     f_in_wrdc = [[0] * number_of_lines for i in range(number_of_columns)]
-    delta_f = [[0] * number_of_lines for i in range(number_of_columns)]   
+    delta_f = [[0] * number_of_lines for i in range(number_of_columns)]
     
     print('Start grid\n')
     
     P_pv_arr = []
     for i in range(number_of_lines):
         P_pv_arr.append((0.4+0.2*i)*P_pv_min)
-#        f_arr.append(find_f(P_pv_arr[i],1000))  
 
     f = open('Относительная погрешность f.csv', 'w')
     f.write(";")
@@ -203,6 +206,8 @@ def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
 
     f.close()
     
+    plot_df(Q_arr, P_pv_arr, delta_f)
+    
     print('Finish!')
 
 def main():
@@ -210,14 +215,14 @@ def main():
     Q = 2000 #емкость аккумулятора
     P_pv_nom = 200 #пиковая мощность фэп в Ваттах
     f_wanted = [1.0, 0.95, 0.9, 0.85]
-    number_of_lines = 36
-    number_of_columns = 32 
+    number_of_lines = 20
+    number_of_columns = 20
     dots_number = 5
     
     os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project5.dck /h')
     P_pv_min = find_P_pv_min()  
 
-    lines_for_different_f(Q, f_wanted, P_pv_min, dots_number)
+    #lines_for_different_f(Q, f_wanted, P_pv_min, dots_number)
     
     grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns)
     
