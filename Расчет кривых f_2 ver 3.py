@@ -1,5 +1,6 @@
 import os
 import matplotlib.pyplot as plt
+import pandas as pd
 
 def in_file(Q_acb, P_pv_max, data_base):
     param_file_name = 'Param_Project2_for_' + data_base + '.txt'
@@ -18,23 +19,15 @@ def find_f(P_pv, Q_acb, data_base):
         os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project2_for_NASA.dck /h')
     else:
         os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project2_for_WRDC.dck /h')
-        
-    f_data = open('data_' + data_base + '.out', 'r')
-    hours_number = 0
-    E_load_sum = 0
-    for string in f_data:
-        if (string.find('+') >= 0):
-            temp = string.split(' ')[4]
-            temp1 = temp[:-2]
-            
-            E_load_sum += float(temp1)
-            hours_number += 1
-            #print(temp1)
-                
-    #print(round(E_load_sum/(hours_number-1)/3.6, 2))
-    f = E_load_sum/(hours_number-1)/3.6
     
-    f_data.close()
+    fixed_df = pd.read_csv('data_' + data_base + '.out', sep='\t', encoding='latin1')
+    fixed_df.columns = ['Time', 'Power', 'Nan']
+    fixed_df = fixed_df.drop(['Nan'], axis=1)
+    fixed_df = fixed_df.drop(0, axis=0)
+    fixed_df = fixed_df.rename(index = str, columns = {1: 'Power'})    
+
+    f = float(sum(fixed_df['Power'])) / len(fixed_df['Power']) /3.6
+    
     return f
     
 def find_P_pv_min():
