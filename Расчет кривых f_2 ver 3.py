@@ -3,19 +3,20 @@ import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+from scipy.optimize import minimize
 
-def in_file(Q_acb, P_pv_max, data_base):
+def in_file(Q_acb, P_pv_max, angle, data_base):
     param_file_name = 'Param_Project2_for_' + data_base + '.txt'
     f = open(param_file_name, 'w')
-    f.write('0 57 24 57\n')
-    f.write('1 1 3 1 57\n')
+    f.write('0 57 24 ' + str(angle[0]) + '\n')
+    f.write('1 1 3 1 ' + str(angle[0]) + '\n')
     f.write("%s\n" % P_pv_max)
     f.write("%s" % Q_acb)
     
     f.close()
 
-def find_f(P_pv, Q_acb, data_base):
-    in_file(Q_acb*3.6, P_pv, data_base)
+def find_f(P_pv, Q_acb, angle, data_base):
+    in_file(Q_acb*3.6, P_pv, angle, data_base)
     
     if (data_base == 'NASA'):
         os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project2_for_NASA.dck /h')
@@ -58,7 +59,7 @@ def bisection(P, Q, f_wanted):
         
 def graph(Q, P, f_wanted):
     for i in range(len(f_wanted)):
-        plt.scatter(Q[i], P[i])
+        plt.plot(Q[i], P[i])
     plt.grid(True)
     plt.xlabel(u'Емкость аккумулятора, кДж')
     plt.ylabel(u'Пиковая мощность фэп, кДж/ч')
@@ -100,12 +101,12 @@ def find_array_f(n, k, P_pv_arr, Q_max, data_base):
     f.write('\n')
         
     for i in range(k):
-        print('k = ', k)
+        print('k = ', i)
         section = []
         f.write("%s;" % Q_arr[i])
         f_1=False
         for j in range(n):
-            print('n = ', n)
+            print('n = ', j)
             print('\n')
             if(f_1==False):
                 section.append(round(find_f(P_pv_arr[j], Q_arr[i], data_base),3))
@@ -171,10 +172,13 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
     #graph_df_f(f_in_nasa, f_wanted)
     print('Finish!')
 
+def delta(angle, P_pv, Q_acb):
+    return (find_f(P_pv, Q_acb, angle, 'NASA') - find_f(P_pv, Q_acb, angle, 'WRDC'))/find_f(P_pv, Q_acb, angle, 'WRDC')
+
 def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
 
-    f_in_nasa = [[0] * number_of_lines for i in range(number_of_columns)]
-    f_in_wrdc = [[0] * number_of_lines for i in range(number_of_columns)]
+    #f_in_nasa = [[0] * number_of_lines for i in range(number_of_columns)]
+    #f_in_wrdc = [[0] * number_of_lines for i in range(number_of_columns)]
     delta_f = [[0] * number_of_lines for i in range(number_of_columns)]
     
     print('Start grid\n')
@@ -186,8 +190,8 @@ def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
     f = open('Относительная погрешность f.csv', 'w')
     f.write(";")
         
-    f_in_nasa = find_array_f(number_of_lines, number_of_columns, P_pv_arr, Q, 'NASA')
-    f_in_wrdc = find_array_f(number_of_lines, number_of_columns, P_pv_arr, Q, 'WRDC')
+    #f_in_nasa = find_array_f(number_of_lines, number_of_columns, P_pv_arr, Q, 'NASA')
+    #f_in_wrdc = find_array_f(number_of_lines, number_of_columns, P_pv_arr, Q, 'WRDC')
     for i in range(number_of_lines):    
         f.write("%s;" % round(P_pv_arr[i], 2))
     f.write('\n')
@@ -195,14 +199,24 @@ def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
     Q_arr = [i for i in range(5, Q + 1, Q // number_of_columns)]
     
     for i in range(number_of_columns):
-        print('column #: ', i)
+        print('column #', i)
         f.write("%s;" % Q_arr[i])
+        angle_in = 57
+        print(angle_in)
+        print(type(angle_in))
         for j in range(number_of_lines):
-            print('line #: ', j)
+            print('line #', j)
             print('\n')
-            delta_f[i][j] = (f_in_nasa[i][j] - f_in_wrdc[i][j])/f_in_wrdc[i][j]
+            
+            #f_corrected = lambda x: f(x,y=y0,z=z0)
+            
+            delta_fun = lambda angle: delta(angle, P_pv = P_pv_arr[j], Q_acb = Q_arr[i])
+            res = minimize(delta_fun, angle_in, method = 'BFGS', bounds = (0, 180), options={'disp': True, 'maxiter': 15})
+            delta_f[i][j] = res.fun
+            #delta(P_pv, Q_acb, angle)
+            print(angle_in)
             f.write("%s;" % round(delta_f[i][j], 3))
-        f.write('\n')
+        f.write('\n')  
 
     f.close()
     
@@ -215,9 +229,9 @@ def main():
     Q = 2000 #емкость аккумулятора
     P_pv_nom = 200 #пиковая мощность фэп в Ваттах
     f_wanted = [1.0, 0.95, 0.9, 0.85]
-    number_of_lines = 20
-    number_of_columns = 20
-    dots_number = 5
+    number_of_lines = 5
+    number_of_columns = 5
+    dots_number = 8
     
     os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project5.dck /h')
     P_pv_min = find_P_pv_min()  
@@ -227,6 +241,15 @@ def main():
     grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns)
     
 main()
+
+
+
+
+
+
+
+
+
 
 
 
