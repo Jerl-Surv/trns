@@ -15,7 +15,7 @@ def in_file(Q_acb, P_pv_max, angle, data_base):
     
     f.close()
 
-def find_f(P_pv, Q_acb, angle, data_base):
+def find_f(angle, P_pv, Q_acb, data_base):
     in_file(Q_acb*3.6, P_pv, angle, data_base)
     
     if (data_base == 'NASA'):
@@ -44,13 +44,13 @@ def find_P_pv_min():
     
     return P_pv_min
 
-def bisection(P, Q, f_wanted):
+def bisection(P, Q, f_wanted, angle):
     Q_1 = 0
     Q_2 = Q
     f_new = 1
     while (f_new > 0.9999*f_wanted) or (f_new < 0.999*f_wanted):
         Q_new = (Q_1 + Q_2)/2
-        f_new = find_f(P, Q_new, 'WRDC')
+        f_new = find_f(P, Q_new, angle, 'WRDC')
         if f_new > 0.9999*f_wanted:
             Q_2 = Q_new
         if f_new < 0.999*f_wanted:
@@ -86,44 +86,11 @@ def plot_df(Q_arr, P_pv_arr, delta):
     plt.title('Simplest default with labels')
     
     plt.savefig('Greed for delta.png')   
-    
-    
-def find_array_f(n, k, P_pv_arr, Q_max, data_base):
-    
-    Q_arr = [i for i in range(5, Q_max + 1, Q_max // k)]
-    
-    f = open('Доля покрытия нагрузки ' + data_base + '.csv', 'w')
-    f_arr = []
-    
-    f.write(";")
-    for i in range(n):    
-        f.write("%s;" % round(P_pv_arr[i], 2))
-    f.write('\n')
-        
-    for i in range(k):
-        print('k = ', i)
-        section = []
-        f.write("%s;" % Q_arr[i])
-        f_1=False
-        for j in range(n):
-            print('n = ', j)
-            print('\n')
-            if(f_1==False):
-                section.append(round(find_f(P_pv_arr[j], Q_arr[i], data_base),3))
-                if(section[j]==1.0):
-                    f_1=True
-            else:
-                section.append(1.0)
-            f.write("%s;" % round(section[j], 3))
-        f_arr.append(section)
-        f.write('\n')
-    
-    f.close()    
-    return f_arr
 
 def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):    
     Q_last = []
-    P_pv_arr = []   
+    P_pv_arr = []
+    angle_in = 57
     
     Q_arr = [[0] * dots_number for i in range(len(f_wanted))]
     P_pv_arr = [[0] * dots_number for i in range(len(f_wanted))]
@@ -150,20 +117,21 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
             
             result.write("%s " % round(P_pv_arr[j][i], 4))
                 
-            if i == 0:
-                Q_arr[j][i] = ( bisection(P_pv_arr[j][i], Q, f_wanted[j]) )
-                print('Расчет ', j)
-                Q = Q_arr[j][i]
-                Q_last.append(Q)
-                #f_in_nasa.append([])
-            else:
-                Q_arr[j][i] = ( bisection(P_pv_arr[j][i], Q_last[j], f_wanted[j]) )
-                Q_last[j] = Q_arr[j][i]
-                
+            #if i == 0:
+                #Q_arr[j][i] = ( bisection(P_pv_arr[j][i], Q, f_wanted[j], angle) )
+                #print('Расчет ', j)
+                #Q = Q_arr[j][i]
+                #Q_last.append(Q)
+            #else:
+                #Q_arr[j][i] = ( bisection(P_pv_arr[j][i], Q_last[j], f_wanted[j], angle) )
+                #Q_last[j] = Q_arr[j][i]
+            
+            #func = lambda x, y: x + y                
+            delta_f_wanted_and_f = lambda angle, P_pv: f_wanted[j] - find_f(angle, P_pv, Q_acb = Q_arr[i], data_base = 'NASA')
+            res = minimize(delta_f_wanted_and_f, [angle_in, P_pv_arr[j][i]], method = 'COBYLA', options={'disp': True, 'maxiter': 5})      
             
             result.write("%s " % round(Q_arr[j][i], 4))
-            #f_in_nasa[j].append(find_f(P_pv_arr[j][i], Q_arr[j][i], 'NASA'))
-            result.write("%s\n" % round(find_f(P_pv_arr[j][i], Q_arr[j][i], 'NASA'), 4))
+            result.write("%s\n" % round(res.fun, 4))
             
             result.close()
   
@@ -173,12 +141,11 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
     print('Finish!')
 
 def delta(angle, P_pv, Q_acb):
+    print('Delta\n')
     return (find_f(P_pv, Q_acb, angle, 'NASA') - find_f(P_pv, Q_acb, angle, 'WRDC'))/find_f(P_pv, Q_acb, angle, 'WRDC')
 
 def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
 
-    #f_in_nasa = [[0] * number_of_lines for i in range(number_of_columns)]
-    #f_in_wrdc = [[0] * number_of_lines for i in range(number_of_columns)]
     delta_f = [[0] * number_of_lines for i in range(number_of_columns)]
     
     print('Start grid\n')
@@ -189,9 +156,7 @@ def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
 
     f = open('Относительная погрешность f.csv', 'w')
     f.write(";")
-        
-    #f_in_nasa = find_array_f(number_of_lines, number_of_columns, P_pv_arr, Q, 'NASA')
-    #f_in_wrdc = find_array_f(number_of_lines, number_of_columns, P_pv_arr, Q, 'WRDC')
+
     for i in range(number_of_lines):    
         f.write("%s;" % round(P_pv_arr[i], 2))
     f.write('\n')
@@ -210,13 +175,11 @@ def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
                 delta_f[i][j] = 0
             else:
                 delta_fun = lambda angle: delta(angle, P_pv = P_pv_arr[j], Q_acb = Q_arr[i])
-                res = minimize(delta_fun, angle_in, method = 'COBYLA', bounds = (0, 180), options={'disp': True, 'maxiter': 3})
-                #callback, **options
+                res = minimize(delta_fun, angle_in, method = 'COBYLA', bounds = (0, 180), options={'disp': True, 'maxiter': 5})
                 delta_f[i][j] = res.fun
                 if (delta_f[i][j] == 0):
                     f_1 = True
                 print(type(delta_f[i][j]))
-                #delta(P_pv, Q_acb, angle)
                 print('Finish angle is: ', res.x, '\n')
             f.write("%s;" % round(delta_f[i][j], 3))
         f.write('\n')  
@@ -239,9 +202,9 @@ def main():
     os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project5.dck /h')
     P_pv_min = find_P_pv_min()  
 
-    #lines_for_different_f(Q, f_wanted, P_pv_min, dots_number)
+    lines_for_different_f(Q, f_wanted, P_pv_min, dots_number)
     
-    grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns)
+    #grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns)
     
 main()
 
