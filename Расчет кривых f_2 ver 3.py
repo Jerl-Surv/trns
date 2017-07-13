@@ -208,13 +208,12 @@ def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
             print('line #', j)
             print('\n')
             
-            #f_corrected = lambda x: f(x,y=y0,z=z0)
-            
             delta_fun = lambda angle: delta(angle, P_pv = P_pv_arr[j], Q_acb = Q_arr[i])
-            res = minimize(delta_fun, angle_in, method = 'BFGS', bounds = (0, 180), options={'disp': True, 'maxiter': 15})
+            res = minimize(delta_fun, angle_in, method = 'COBYLA', bounds = (0, 180), options={'disp': True, 'maxiter': 10})
+            #callback, **options
             delta_f[i][j] = res.fun
             #delta(P_pv, Q_acb, angle)
-            print(angle_in)
+            print('Finish angle is: ', res.x, '\n')
             f.write("%s;" % round(delta_f[i][j], 3))
         f.write('\n')  
 
