@@ -202,18 +202,22 @@ def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
         print('column #', i)
         f.write("%s;" % Q_arr[i])
         angle_in = 57
-        print(angle_in)
-        print(type(angle_in))
+        f_1 = False
         for j in range(number_of_lines):
             print('line #', j)
-            print('\n')
-            
-            delta_fun = lambda angle: delta(angle, P_pv = P_pv_arr[j], Q_acb = Q_arr[i])
-            res = minimize(delta_fun, angle_in, method = 'COBYLA', bounds = (0, 180), options={'disp': True, 'maxiter': 10})
-            #callback, **options
-            delta_f[i][j] = res.fun
-            #delta(P_pv, Q_acb, angle)
-            print('Finish angle is: ', res.x, '\n')
+            print('\n')            
+            if (f_1 == True):
+                delta_f[i][j] = 0
+            else:
+                delta_fun = lambda angle: delta(angle, P_pv = P_pv_arr[j], Q_acb = Q_arr[i])
+                res = minimize(delta_fun, angle_in, method = 'COBYLA', bounds = (0, 180), options={'disp': True, 'maxiter': 3})
+                #callback, **options
+                delta_f[i][j] = res.fun
+                if (delta_f[i][j] == 0):
+                    f_1 = True
+                print(type(delta_f[i][j]))
+                #delta(P_pv, Q_acb, angle)
+                print('Finish angle is: ', res.x, '\n')
             f.write("%s;" % round(delta_f[i][j], 3))
         f.write('\n')  
 
@@ -228,8 +232,8 @@ def main():
     Q = 2000 #емкость аккумулятора
     P_pv_nom = 200 #пиковая мощность фэп в Ваттах
     f_wanted = [1.0, 0.95, 0.9, 0.85]
-    number_of_lines = 5
-    number_of_columns = 5
+    number_of_lines = 10
+    number_of_columns = 10
     dots_number = 8
     
     os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project5.dck /h')
