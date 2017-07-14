@@ -74,12 +74,7 @@ def plot_df(Q_arr, P_pv_arr, delta):
     y = P_pv_arr
     X, Y = np.meshgrid(x, y)
     Z = delta
-    
-    
-    # Create a simple contour plot with labels using default colors.  The
-    # inline argument to clabel will control whether the labels are draw
-    # over the line segments of the contour, removing the lines beneath
-    # the label
+
     plt.figure()
     CS = plt.contour(X, Y, Z)
     plt.clabel(CS, inline=1, fontsize=10)
@@ -127,7 +122,7 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
                 #Q_last[j] = Q_arr[j][i]
             
             #func = lambda x, y: x + y                
-            delta_f_wanted_and_f = lambda angle, P_pv: f_wanted[j] - find_f(angle, P_pv, Q_acb = Q_arr[i], data_base = 'NASA')
+            delta_f_wanted_and_f = lambda angle_P_pv: delta_f_w_and_f(angle_P_pv, f_want = f_wanted[j], Q_acb = Q_arr[i])
             res = minimize(delta_f_wanted_and_f, [angle_in, P_pv_arr[j][i]], method = 'COBYLA', options={'disp': True, 'maxiter': 5})      
             
             result.write("%s " % round(Q_arr[j][i], 4))
@@ -139,6 +134,10 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
     graph(Q_arr, P_pv_arr, f_wanted)
     #graph_df_f(f_in_nasa, f_wanted)
     print('Finish!')
+
+def delta_f_w_and_f(angle_P_pv, f_want, Q_acb):
+    return f_want - find_f(float(angle_P_pv[0]), float(angle_P_pv[1]), Q_acb, 'NASA')
+
 
 def delta(angle, P_pv, Q_acb):
     print('Delta\n')
@@ -202,9 +201,9 @@ def main():
     os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project5.dck /h')
     P_pv_min = find_P_pv_min()  
 
-    lines_for_different_f(Q, f_wanted, P_pv_min, dots_number)
+    #lines_for_different_f(Q, f_wanted, P_pv_min, dots_number)
     
-    #grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns)
+    grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns)
     
 main()
 
