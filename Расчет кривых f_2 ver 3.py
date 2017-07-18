@@ -15,7 +15,7 @@ def in_file(Q_acb, P_pv_max, angle, data_base):
     
     f.close()
 
-def find_f(angle, P_pv, Q_acb, data_base):
+def find_f(P_pv, Q_acb, angle, data_base):
     in_file(Q_acb*3.6, P_pv, angle, data_base)
     
     if (data_base == 'NASA'):
@@ -44,13 +44,13 @@ def find_P_pv_min():
     
     return P_pv_min
 
-def bisection(P, Q, f_wanted, angle):
+def bisection(P, Q, f_wanted):
     Q_1 = 0
     Q_2 = Q
     f_new = 1
     while (f_new > 0.9999*f_wanted) or (f_new < 0.999*f_wanted):
         Q_new = (Q_1 + Q_2)/2
-        f_new = find_f(P, Q_new, angle, 'WRDC')
+        f_new = find_f(P, Q_new, 'WRDC')
         if f_new > 0.9999*f_wanted:
             Q_2 = Q_new
         if f_new < 0.999*f_wanted:
@@ -72,20 +72,55 @@ def plot_df(Q_arr, P_pv_arr, delta):
     
     x = Q_arr
     y = P_pv_arr
-    X, Y = np.meshgrid(x, y)
     Z = delta
-
+    f_f = False
+              
+    X, Y = np.meshgrid(x, y)
+    
     plt.figure()
     CS = plt.contour(X, Y, Z)
     plt.clabel(CS, inline=1, fontsize=10)
-    plt.title('Simplest default with labels')
+    plt.title('Greed for delta')
     
     plt.savefig('Greed for delta.png')   
+    
+    
+def find_array_f(n, k, P_pv_arr, Q_max, data_base):
+    
+    Q_arr = [i for i in range(5, Q_max + 1, Q_max // k)]
+    
+    f = open('Доля покрытия нагрузки ' + data_base + '.csv', 'w')
+    f_arr = []
+    
+    f.write(";")
+    for i in range(n):    
+        f.write("%s;" % round(P_pv_arr[i], 2))
+    f.write('\n')
+        
+    for i in range(k):
+        print('k = ', i)
+        section = []
+        f.write("%s;" % Q_arr[i])
+        f_1=False
+        for j in range(n):
+            print('n = ', j)
+            print('\n')
+            if(f_1==False):
+                section.append(round(find_f(P_pv_arr[j], Q_arr[i], data_base),3))
+                if(section[j]==1.0):
+                    f_1=True
+            else:
+                section.append(1.0)
+            f.write("%s;" % round(section[j], 3))
+        f_arr.append(section)
+        f.write('\n')
+    
+    f.close()    
+    return f_arr
 
 def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):    
     Q_last = []
-    P_pv_arr = []
-    angle_in = 57
+    P_pv_arr = []   
     
     Q_arr = [[0] * dots_number for i in range(len(f_wanted))]
     P_pv_arr = [[0] * dots_number for i in range(len(f_wanted))]
@@ -112,21 +147,20 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
             
             result.write("%s " % round(P_pv_arr[j][i], 4))
                 
-            #if i == 0:
-                #Q_arr[j][i] = ( bisection(P_pv_arr[j][i], Q, f_wanted[j], angle) )
-                #print('Расчет ', j)
-                #Q = Q_arr[j][i]
-                #Q_last.append(Q)
-            #else:
-                #Q_arr[j][i] = ( bisection(P_pv_arr[j][i], Q_last[j], f_wanted[j], angle) )
-                #Q_last[j] = Q_arr[j][i]
-            
-            #func = lambda x, y: x + y                
-            delta_f_wanted_and_f = lambda angle_P_pv: delta_f_w_and_f(angle_P_pv, f_want = f_wanted[j], Q_acb = Q_arr[i])
-            res = minimize(delta_f_wanted_and_f, [angle_in, P_pv_arr[j][i]], method = 'COBYLA', options={'disp': True, 'maxiter': 5})      
+            if i == 0:
+                Q_arr[j][i] = ( bisection(P_pv_arr[j][i], Q, f_wanted[j]) )
+                print('Расчет ', j)
+                Q = Q_arr[j][i]
+                Q_last.append(Q)
+                #f_in_nasa.append([])
+            else:
+                Q_arr[j][i] = ( bisection(P_pv_arr[j][i], Q_last[j], f_wanted[j]) )
+                Q_last[j] = Q_arr[j][i]
+                
             
             result.write("%s " % round(Q_arr[j][i], 4))
-            result.write("%s\n" % round(res.fun, 4))
+            #f_in_nasa[j].append(find_f(P_pv_arr[j][i], Q_arr[j][i], 'NASA'))
+            result.write("%s\n" % round(find_f(P_pv_arr[j][i], Q_arr[j][i], 'NASA'), 4))
             
             result.close()
   
@@ -135,12 +169,7 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
     #graph_df_f(f_in_nasa, f_wanted)
     print('Finish!')
 
-def delta_f_w_and_f(angle_P_pv, f_want, Q_acb):
-    return f_want - find_f(float(angle_P_pv[0]), float(angle_P_pv[1]), Q_acb, 'NASA')
-
-
 def delta(angle, P_pv, Q_acb):
-    print('Delta\n')
     return (find_f(P_pv, Q_acb, angle, 'NASA') - find_f(P_pv, Q_acb, angle, 'WRDC'))/find_f(P_pv, Q_acb, angle, 'WRDC')
 
 def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
@@ -151,7 +180,7 @@ def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
     
     P_pv_arr = []
     for i in range(number_of_lines):
-        P_pv_arr.append((0.4+0.2*i)*P_pv_min)
+        P_pv_arr.append((0.001+0.001*i)*P_pv_min)
 
     f = open('Относительная погрешность f.csv', 'w')
     f.write(";")
@@ -160,7 +189,7 @@ def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
         f.write("%s;" % round(P_pv_arr[i], 2))
     f.write('\n')
     
-    Q_arr = [i for i in range(5, Q + 1, Q // number_of_columns)]
+    Q_arr = [i for i in range(10, Q + 1, Q // number_of_columns)]
     
     for i in range(number_of_columns):
         print('column #', i)
@@ -174,11 +203,13 @@ def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
                 delta_f[i][j] = 0
             else:
                 delta_fun = lambda angle: delta(angle, P_pv = P_pv_arr[j], Q_acb = Q_arr[i])
-                res = minimize(delta_fun, angle_in, method = 'COBYLA', bounds = (0, 180), options={'disp': True, 'maxiter': 5})
+                res = minimize(delta_fun, angle_in, method = 'COBYLA', bounds = (0, 180), options={'disp': True, 'maxiter': 3})
+                #callback, **options
                 delta_f[i][j] = res.fun
                 if (delta_f[i][j] == 0):
                     f_1 = True
                 print(type(delta_f[i][j]))
+                #delta(P_pv, Q_acb, angle)
                 print('Finish angle is: ', res.x, '\n')
             f.write("%s;" % round(delta_f[i][j], 3))
         f.write('\n')  
@@ -191,7 +222,7 @@ def grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns):
 
 def main():
     print('Start')
-    Q = 2000 #емкость аккумулятора
+    Q = 1000 #емкость аккумулятора
     P_pv_nom = 200 #пиковая мощность фэп в Ваттах
     f_wanted = [1.0, 0.95, 0.9, 0.85]
     number_of_lines = 10
@@ -206,7 +237,6 @@ def main():
     grid_for_df(Q, P_pv_min, number_of_lines, number_of_columns)
     
 main()
-
 
 
 
