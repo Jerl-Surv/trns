@@ -85,22 +85,24 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
             angle_in = [57, 0.5*Q_start_nasa[j]]
             delta_fun_nasa = lambda angle_Q: min_angle_and_Q(angle_Q, P_pv = P_pv_arr[j][i], data_base = 'NASA', f_wanted = f_wanted[j])
             if (i == 0):
-                res = minimize(delta_fun_nasa, angle_in, method = 'COBYLA', bounds = ((0, 180), (0.2*Q, Q)), options={'disp': True, 'maxiter': 7})
+                res = minimize(delta_fun_nasa, angle_in, method = 'COBYLA', bounds = ((0, 90), (0.2*Q, Q)), options={'disp': True, 'maxiter': 8})
             else:
-                res = minimize(delta_fun_nasa, angle_in, method = 'COBYLA', bounds = ((0, 180), (0.2*Q_start_nasa[j-1], Q_start_nasa[j-1])), options={'disp': True, 'maxiter': 7})
+                res = minimize(delta_fun_nasa, angle_in, method = 'COBYLA', bounds = ((0, 90), (0.2*Q_start_nasa[j-1], Q_start_nasa[j-1])), options={'disp': True, 'maxiter': 8})
             Q_arr_nasa[j][i] = res.x[1]
             Q_start_nasa[j] = res.x[1]
-            print('Result NASA: ', res.x[1])             
+            print('Result NASA: ', res.x[0])             
             
             angle_in = [57, 0.5*Q_start_wrdc[j]]
             delta_fun_wrdc = lambda angle_Q: min_angle_and_Q(angle_Q, P_pv = P_pv_arr[j][i], data_base = 'WRDC', f_wanted = f_wanted[j])
             if (i == 0):
-                res = minimize(delta_fun_wrdc, angle_in, method = 'COBYLA', bounds = ((0, 180), (0.2*Q, Q)), options={'disp': True, 'maxiter': 7})
+                res = minimize(delta_fun_wrdc, angle_in, method = 'COBYLA', bounds = ((0, 90), (0.2*Q, Q)), options={'disp': True, 'maxiter': 8})
             else:
-                res = minimize(delta_fun_wrdc, angle_in, method = 'COBYLA', bounds = ((0, 180), (0.2*Q_start_wrdc[j-1], Q_start_wrdc)), options={'disp': True, 'maxiter': 7})
+                res = minimize(delta_fun_wrdc, angle_in, method = 'COBYLA', bounds = ((0, 90), (0.2*Q_start_wrdc[j-1], Q_start_wrdc[j-1])), options={'disp': True, 'maxiter': 8})
+            
             Q_arr_wrdc[j][i] = res.x[1]
             Q_start_wrdc[j] = res.x[1]
-            print('Result WRDC: ', res.x[1])       
+                
+            print('Result WRDC: ', res.x[0])       
             
             P_pv_arr[j][i] /= 3.6
             Q_arr_nasa[j][i] /= 3.6
@@ -116,15 +118,15 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
     print('Finish!')
 
 def min_angle_and_Q(angle_Q, P_pv, data_base, f_wanted):
-    return f_wanted - find_f(P_pv, angle_Q[1], angle_Q[0], data_base)
+    return abs(f_wanted - find_f(P_pv, angle_Q[1], angle_Q[0], data_base))
 
 def main():
     print('Start')
     Q = 50 #емкость аккумулятора в кДж
-    f_wanted = [1.0, 0.9]
+    f_wanted = [1.0, 0.85]
     number_of_lines = 10
     number_of_columns = 10
-    dots_number = 15
+    dots_number = 5
     
     os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project5.dck /h')
     P_pv_min = find_P_pv_min()  
