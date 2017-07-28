@@ -55,6 +55,15 @@ def save_plot(Q_1, Q_2, P, f_wanted):
         plt.ylabel(u'Пиковая мощность фэп/Пиковая мощность нагрузки')
         plt.legend()
         plt.savefig('For f = ' + str(f_wanted[i]) + '.png')
+        
+def find_min(angle_in, rhobeg, P_pv_cur, data_b, f_want):
+    print('Start: ', angle_in[1])
+    delta_fun_nasa = lambda angle_Q: min_angle_and_Q(angle_Q, P_pv = P_pv_cur, data_base = data_b, f_wanted = f_want)
+    if (rhobeg == True):
+        res = minimize(delta_fun_nasa, angle_in, method = 'COBYLA', options={'disp': False, 'maxiter': 20, 'rhobeg': 0.2})
+    else:
+        res = minimize(delta_fun_nasa, angle_in, method = 'COBYLA', options={'disp': False, 'maxiter': 20})
+    return res
     
 def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):    
  
@@ -83,25 +92,27 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
             else:
                 result = open('Result_file_for_f_1_0.txt', 'a')
             
-            angle_in = [57, 0.55*Q_start_nasa[j][i]]
-            print('Start: ', 0.55*Q_start_nasa[j][i])
-            print('Bound: ', Q_start_nasa[j])
-            delta_fun_nasa = lambda angle_Q: min_angle_and_Q(angle_Q, P_pv = P_pv_arr[j][i], data_base = 'NASA', f_wanted = f_wanted[j])
-            res = minimize(delta_fun_nasa, angle_in, method = 'COBYLA', bounds = ((0, 90), (0, Q_start_nasa[j][i])), options={'disp': False, 'maxiter': 20})
+            if (i == 0):
+                angle_in = [57, 0.55*Q_start_nasa[j][i]]
+                res = find_min(angle_in, False, P_pv_arr[j][i], 'NASA', f_wanted[j])
+            else:
+                angle_in = [57, 0.2*Q_start_nasa[j][i]]
+                res = find_min(angle_in, True, P_pv_arr[j][i], 'NASA', f_wanted[j])                
             
             Q_arr_nasa[j][i] = res.x[1]
             Q_start_nasa[j][i+1] = res.x[1]
             print('Result NASA: ', res.x[0], res.x[1], res.fun)             
             
-            angle_in = [57, 0.55*Q_start_wrdc[j][i]]
-            print('Start: ', 0.55*Q_start_wrdc[j][i])
-            print('Bound: ', Q_start_wrdc[j])            
-            delta_fun_wrdc = lambda angle_Q: min_angle_and_Q(angle_Q, P_pv = P_pv_arr[j][i], data_base = 'WRDC', f_wanted = f_wanted[j])
-            res = minimize(delta_fun_wrdc, angle_in, method = 'COBYLA', bounds = ((0, 90), (0, Q_start_wrdc[j][i])), options={'disp': False, 'maxiter': 20})
+            
+            if (i == 0):
+                angle_in = [57, 0.55*Q_start_wrdc[j][i]]
+                res = find_min(angle_in, False, P_pv_arr[j][i], 'WRDC', f_wanted[j])
+            else:
+                angle_in = [57, 0.2*Q_start_wrdc[j][i]]
+                res = find_min(angle_in, True, P_pv_arr[j][i], 'WRDC', f_wanted[j]) 
             
             Q_arr_wrdc[j][i] = res.x[1]
-            Q_start_wrdc[j][i+1] = res.x[1]
-                
+            Q_start_wrdc[j][i+1] = res.x[1]  
             print('Result WRDC: ', res.x[0], res.x[1], res.fun)       
             
             P_pv_arr[j][i] /= 3.6
@@ -125,10 +136,10 @@ def min_angle_and_Q(angle_Q, P_pv, data_base, f_wanted):
 def main():
     print('Start')
     Q = 90 #емкость аккумулятора в кДж
-    f_wanted = [0.99999, 0.95, 0.9]
+    f_wanted = [0.8]
     number_of_lines = 10
     number_of_columns = 10
-    dots_number = 10
+    dots_number = 15
     
     os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project5.dck /h')
     P_pv_min = find_P_pv_min()  
