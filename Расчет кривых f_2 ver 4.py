@@ -61,7 +61,8 @@ def save_plot(Q_1, Q_2, P, f_wanted):
 def find_min(angle_in, P_pv_cur, data_b, f_want, maxit):
     print('Start: ', angle_in[1])
     delta_fun = lambda angle_Q: min_angle_and_Q(angle_Q, P_pv = P_pv_cur, data_base = data_b, f_wanted = f_want)
-    res = minimize(delta_fun, angle_in, method = 'COBYLA', options={'disp': False, 'maxiter': maxit})
+    res = minimize(delta_fun, angle_in, method = 'Nelder-Mead', options={'disp': False, 'maxiter': maxit})
+    #res = minimize(delta_fun, angle_in, method = 'TNC', bounds = ((0, 90), (0, 2*angle_in[1])), options={'disp': False, 'maxiter': maxit})
     return res
     
 def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):    
@@ -86,39 +87,39 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
             print('f =', f_wanted[j])
             print('\n')
             #  if (i != 0 and P_pv_arr[j][i])
-            P_pv_arr[j][i] = ( (1 + 0.05*i)*P_pv_min*(f_wanted[j]**0.5) )
+            P_pv_arr[j][i] = ( (1 + 0.0005*i)*P_pv_min*f_wanted[j] )
             if f_wanted[j] < 1:
                 result = open('Result_file_for_f_0_' + str(f_wanted[j]*100) + '.txt', 'a')
             else:
                 result = open('Result_file_for_f_1_0.txt', 'a')
             
-            angle_in = [57, 0.8*Q_start_nasa[j][i]]
+            angle_in = [57, 0.8*Q_start_nasa[j][i]*f_wanted[j]]
             res = find_min(angle_in, P_pv_arr[j][i], 'NASA', f_wanted[j], 10)           
             count_error_1 = False
             count_error_2 = False
 
             if np.all(count_error_2 == False and i != 0 and (res.x - Q_arr_nasa[j][i-1]*3.6) > 0):
-                angle_in = [57, 0.1*Q_start_nasa[j][i]]
+                angle_in = [57, 0.2*Q_start_nasa[j][i]*f_wanted[j]]
                 res = find_min(angle_in, P_pv_arr[j][i], 'NASA', f_wanted[j], 20)
                 count_error_2 = True
-            if np.all(res.fun > 0.01 and i != 0 and count_error_1 == False):
-                angle_in = [57, 0.03*Q_start_nasa[j][i]]
+            if np.all(res.fun > 0.005 and i != 0 and count_error_1 == False):
+                angle_in = [57, 0.1*Q_start_nasa[j][i]*f_wanted[j]]
                 res = find_min(angle_in, P_pv_arr[j][i], 'NASA', f_wanted[j], 30)
                 count_error_1 = True            
             Q_arr_nasa[j][i] = res.x[1]
             Q_start_nasa[j][i+1] = res.x[1]
             print('Result NASA: ', res.x[0], res.x[1], res.fun)             
             
-            angle_in = [57, 0.8*Q_start_wrdc[j][i]]
+            angle_in = [57, 0.8*Q_start_wrdc[j][i]*f_wanted[j]]
             res = find_min(angle_in, P_pv_arr[j][i], 'WRDC', f_wanted[j], 10)
             count_error_1 = False
             count_error_2 = False
             if np.all(count_error_2 == False and i != 0 and (res.x - Q_arr_wrdc[j][i-1]*3.6) > 0):
-                angle_in = [57, 0.1*Q_start_wrdc[j][i]]
+                angle_in = [57, 0.2*Q_start_wrdc[j][i]*f_wanted[j]]
                 res = find_min(angle_in, P_pv_arr[j][i], 'WRDC', f_wanted[j], 20)
                 count_error_2 = True
-            if np.all(res.fun > 0.01 and i != 0 and count_error_1 == False):
-                angle_in = [57, 0.03*Q_start_wrdc[j][i]]
+            if np.all(res.fun > 0.005 and i != 0 and count_error_1 == False):
+                angle_in = [57, 0.1*Q_start_wrdc[j][i]*f_wanted[j]]
                 res = find_min(angle_in, P_pv_arr[j][i], 'WRDC', f_wanted[j], 30)
                 count_error_1 = True        
             Q_arr_wrdc[j][i] = res.x[1]
@@ -145,17 +146,17 @@ def min_angle_and_Q(angle_Q, P_pv, data_base, f_wanted):
 
 def main():
     print('Start')
-    Q = 100 #емкость аккумулятора в кДж
-    f_wanted = [0.999, 0.8]
+    Q = 150 #емкость аккумулятора в кДж
+    f_wanted = [0.999, 0.99]
     number_of_lines = 10
     number_of_columns = 10
-    dots_number = 5
+    dots_number = 7 
     
     os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project5.dck /h')
     P_pv_min = find_P_pv_min()  
 
     lines_for_different_f(Q, f_wanted, P_pv_min, dots_number)
-    
+
 main()
 
 #def f(x, y):
