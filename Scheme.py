@@ -6,7 +6,7 @@ def pv_simple(P_pv_max, radiation):
     # P_out = P_pv_max*radiation/1000
     return P_pv_max*radiation/1000
     
-def controler_simple():
+def controler_simple(P_load_max, P_pv):
     '''
         if (P_load_max <= P_pv){
         P_load_out = P_load_max;
