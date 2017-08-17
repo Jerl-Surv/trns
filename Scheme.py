@@ -2,9 +2,9 @@ def for_angle():
     # разобраться, как пересчитывать угол
     push
     
-def pv_simple():
+def pv_simple(P_pv_max, radiation):
     # P_out = P_pv_max*radiation/1000
-    push
+    return P_pv_max*radiation/1000
     
 def controler_simple():
     '''
