@@ -1,3 +1,14 @@
+def data_for_station(station_name):
+    #Staton name: [latitude, longitude]
+    data_frame_stations = ({'ALEXANDROVSKOE': [60.43, 77,87], "ARKHANGEL'SK": [64.58, 40.50], 'CHETYREKH-STOLBOVOI IS.': [70.63, 162.40], 
+                            'CHITA': [52.02, 113.33], 'DICKSON IS.': [73.50, 80.40], 'EKATERINBURG': [56.80, 60.63], 'FEDOROV OBS.': [77.72, 104.28], 
+                            'IRKUTSK': [52.27, 104.35], 'KHABAROVSK': [48.52, 135.17], 'KOTELNY IS.': [76.00, 137.90], 'KRENKEL OBS.': [80.62, 58.05], 
+                            'MIRNY': [-66.55, 93.02], 'MOSCOW / PODMOSKOVNAYA': [55.72, 37.20], 'MOSCOW UNIV.': [55.70, 37.50]})
+    return data_frame_stations[station_name]
+
+def file_generator():
+    push
+
 def for_angle():
     # разобраться, как пересчитывать угол
     push
@@ -6,7 +17,11 @@ def pv_simple(P_pv_max, radiation):
     # P_out = P_pv_max*radiation/1000
     return P_pv_max*radiation/1000
     
-def controler_simple(P_load_max, P_pv):
+def controler_simple(P_load_max, P_pv, Q_acb):
+    if (P_load_max <= P_pv):
+        battery_simple.input_energy(Q_acb, P_bat, dt)
+    else:
+        battery_simple.output_energy(Q_acb, P_bat, dt)
     '''
         if (P_load_max <= P_pv){
         P_load_out = P_load_max;
@@ -32,14 +47,13 @@ def controler_simple(P_load_max, P_pv):
 //		 Pакк
 			xout[1]=P_bat;
     '''
-    push
     
 class battery_simple:
     # разобраться с ооп
-    def input_energy():
+    def input_energy(Q_acb, P_bat, dt):
         push
     
-    def output_energy():
+    def output_energy(Q_acb, P_bat, dt):
         push
     '''
     //		 Енактек
@@ -52,9 +66,25 @@ class battery_simple:
         dtdt = P_bat/E_bat_max;
         
         double &dtdt,  // the array containing the derivatives of T which are evaluated
+        double &t,     // the array containing the dependent variables for which the derivatives are evaluated
     '''
-        
-def scheme():
+
+def read_data():
+    nasa_data = pd.read_csv('data_sum_r_NASA.txt', sep='\t', encoding='latin1')
+    nasa_data.columns = ['NASA'] 
+    wrdc_data = pd.read_csv('data_sum_r_WRDC.txt', sep='\t', encoding='latin1')
+    wrdc_data.columns = ['WRDC']     
+    nasa_and_wrdc_data = nasa_data.merge(wrdc_data, 'left', on='NASA')
+    return nasa_and_wrdc_data
+             
+def scheme(P_load_max, Q_acb, angle):
     # разобраться с передачей в файл данных
-    push
+    nasa_and_wrdc_data = read_data()
+    radiation = for_angle(nasa_and_wrdc_data, angle)
+    P_pv = pv_simple(P_pv_max, radiation)
+    P_load = controler_simple(P_load_max, P_pv, Q_acb)
+    return P_load
+
+
+#def P_pv_for_max ???
     
