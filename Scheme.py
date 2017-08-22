@@ -19,18 +19,24 @@ def file_generator():
 def pv_simple(P_pv_max, radiation):
     return radiation*P_pv_max*0.001
     
-def controler_simple(P_load_max, P_pv, Q_acb):
+def controler_simple(P_load_max, P_pv, Q_acb, dt):
     E_in_bat_NASA = [0 for i in range(nasa_and_wrdc_data['NASA'])]
     E_in_bat_WRDC = [0 for i in range(nasa_and_wrdc_data['WRDC'])]
+    P_load = P_pv
     for i in range(len(nasa_and_wrdc_data['NASA'])):
+        P_bat = 0
         # NASA
         if (P_load_max <= P_pv['NASA'][i]):
-            battery_simple.input_energy(Q_acb, P_bat, dt)
+            P_bat = P_pv['NASA'][i] - P_load_max
+            P_load['NASA'][i] = P_load_max
+            E_in_bat_NASA[i] = battery_simple.input_energy(Q_acb, P_bat, E_in_bat_NASA[i-1], dt)
         else:
-            battery_simple.output_energy(Q_acb, P_bat, dt)
+            P_bat = P_load_max - P_pv['NASA'][i]
+            E_in_bat_NASA[i] = battery_simple.output_energy(Q_acb, P_bat, E_in_bat_NASA[i-1], dt)
         # WRDC
         if (P_load_max <= P_pv['WRDC'][i]):
-            battery_simple.input_energy(Q_acb, P_bat, dt)
+            P_bat = P_pv['WRDC'][i] - P_load_max
+            E_in_bat_WRDC[i] = battery_simple.input_energy(Q_acb, P_bat, E_in_bat_WRDC[i-1], dt)
         else:
             battery_simple.output_energy(Q_acb, P_bat, dt)        
     '''
@@ -60,15 +66,16 @@ def controler_simple(P_load_max, P_pv, Q_acb):
     '''
     
 class battery_simple:
-    def from_array_P_generator(dt):
+    def from_array_P_generator(i):
         push
-        # возвращает значение Р соответствующее позиции заданного t в массиве
+        # возвращает значение Р соответствующее позиции i
     
-    def input_energy(Q_acb, P_bat, dt):
-        push
+    def input_energy(Q_acb, P_bat, i):
+        # решаем диффур dE/dt = P, находим E_in_bat[i]; dt = 1, P = P_bat (поступающая в батарею мощность на шаге)
+        return max(Q_acb, E_in)
     
-    def output_energy(Q_acb, P_bat, dt):
-        push
+    def output_energy(Q_acb, P_bat, i):
+        return max(0, E_in - E_out)
     '''
     //		 Енактек
 			xout[0]=t;
