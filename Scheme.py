@@ -1,5 +1,5 @@
-def count_params():
-    push
+from scipy.integrate import odeint
+import pandas as pd
 
 def data_for_station(station_name):
     #Staton name: [latitude, longitude]
@@ -15,18 +15,24 @@ def data_for_station(station_name):
 
 def file_generator():
     push
-
-def for_angle():
-    push
     
 def pv_simple(P_pv_max, radiation):
-    return P_pv_max*radiation/1000
+    return radiation*P_pv_max*0.001
     
 def controler_simple(P_load_max, P_pv, Q_acb):
-    if (P_load_max <= P_pv):
-        battery_simple.input_energy(Q_acb, P_bat, dt)
-    else:
-        battery_simple.output_energy(Q_acb, P_bat, dt)
+    E_in_bat_NASA = [0 for i in range(nasa_and_wrdc_data['NASA'])]
+    E_in_bat_WRDC = [0 for i in range(nasa_and_wrdc_data['WRDC'])]
+    for i in range(len(nasa_and_wrdc_data['NASA'])):
+        # NASA
+        if (P_load_max <= P_pv['NASA'][i]):
+            battery_simple.input_energy(Q_acb, P_bat, dt)
+        else:
+            battery_simple.output_energy(Q_acb, P_bat, dt)
+        # WRDC
+        if (P_load_max <= P_pv['WRDC'][i]):
+            battery_simple.input_energy(Q_acb, P_bat, dt)
+        else:
+            battery_simple.output_energy(Q_acb, P_bat, dt)        
     '''
         if (P_load_max <= P_pv){
         P_load_out = P_load_max;
@@ -54,7 +60,10 @@ def controler_simple(P_load_max, P_pv, Q_acb):
     '''
     
 class battery_simple:
-    # разобраться с ооп
+    def from_array_P_generator(dt):
+        push
+        # возвращает значение Р соответствующее позиции заданного t в массиве
+    
     def input_energy(Q_acb, P_bat, dt):
         push
     
@@ -80,18 +89,23 @@ def read_data():
     wrdc_data = pd.read_csv('data_sum_r_WRDC.txt', sep='\t', encoding='latin1')
     wrdc_data.columns = ['WRDC']     
     nasa_and_wrdc_data = nasa_data.merge(wrdc_data, 'left', on='NASA')
+    # на выходе данные в виде двух столбцов с названиями 'NASA' и 'WRDC'
     return nasa_and_wrdc_data
 
-def P_pv_for_max():
+def P_pv_for_max_scheme():
     push
              
-def scheme(P_load_max, Q_acb, angle):
+def main_scheme(P_load_max, Q_acb, angle, params, station_name):
     # разобраться с передачей в файл данных
-    nasa_and_wrdc_data = read_data()
-    radiation = for_angle(nasa_and_wrdc_data, angle)
-    P_pv = pv_simple(P_pv_max, radiation)
-    P_load = controler_simple(P_load_max, P_pv, Q_acb)
+    dt = 1 # данные с шагом в 1 час
+    P_pv_max = 100 # Вт, пиковая мощность фэп
+    nasa_and_wrdc_data = read_data() # два столбца: 'NASA' и 'WRDC', сырые данные по радиации из баз данных
+    t_array = [i for i in range(len(nasa_and_wrdc_data['NASA']))]
+    radiation = angle_solver(nasa_and_wrdc_data, angle, data_for_station(station_name)) # два столбца: 'NASA' и 'WRDC'; пересчитанные данные с горизонтали на угол
+    P_pv = pv_simple(P_pv_max, radiation) # два столбца: 'NASA' и 'WRDC'; выходная мощность с фэп
+    P_load = controler_simple(P_load_max, P_pv, Q_acb) # два столбца: 'NASA' и 'WRDC'; мощность, поступающая на нагрузку
     return P_load
+
 
 
 
