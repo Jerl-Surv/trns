@@ -33,6 +33,7 @@ def controler_simple(P_load_max, P_pv, Q_acb, dt):
         else:
             P_bat = P_load_max - P_pv['NASA'][i]
             E_in_bat_NASA[i] = battery_simple.output_energy(Q_acb, P_bat, E_in_bat_NASA[i-1], dt)
+            P_load['NASA'][i] = P_pv['NASA'][i] + P_from_bat # прописать P_from_bat
         # WRDC
         if (P_load_max <= P_pv['WRDC'][i]):
             P_bat = P_pv['WRDC'][i] - P_load_max
@@ -72,6 +73,7 @@ class battery_simple:
     
     def input_energy(Q_acb, P_bat, i):
         # решаем диффур dE/dt = P, находим E_in_bat[i]; dt = 1, P = P_bat (поступающая в батарею мощность на шаге)
+        # E_in = odeint(from_array_P_generator, i, [0, 1])
         return max(Q_acb, E_in)
     
     def output_energy(Q_acb, P_bat, i):
