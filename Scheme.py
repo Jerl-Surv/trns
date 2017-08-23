@@ -20,77 +20,43 @@ def pv_simple(P_pv_max, radiation):
     return radiation*P_pv_max*0.001
     
 def controler_simple(P_load_max, P_pv, Q_acb, dt):
-    E_in_bat_NASA = [0 for i in range(nasa_and_wrdc_data['NASA'])]
-    E_in_bat_WRDC = [0 for i in range(nasa_and_wrdc_data['WRDC'])]
+    E_in_bat_NASA = [0 for i in range(len(nasa_and_wrdc_data['NASA']) + 1)]
+    E_in_bat_WRDC = [0 for i in range(len(nasa_and_wrdc_data['WRDC']) + 1)]
     P_load = P_pv
-    for i in range(len(nasa_and_wrdc_data['NASA'])):
-        P_bat = 0
+    for i in range(len(nasa_and_wrdc_data['NASA']) + 1):
         # NASA
         if (P_load_max <= P_pv['NASA'][i]):
             P_bat = P_pv['NASA'][i] - P_load_max
             P_load['NASA'][i] = P_load_max
-            E_in_bat_NASA[i] = battery_simple.input_energy(Q_acb, P_bat, E_in_bat_NASA[i-1], dt)
+            E_in_bat_NASA[i] = battery_simple.input_energy(Q_acb, P_bat, E_in_bat_NASA[i-1])
         else:
             P_bat = P_load_max - P_pv['NASA'][i]
-            E_in_bat_NASA[i] = battery_simple.output_energy(Q_acb, P_bat, E_in_bat_NASA[i-1], dt)
-            P_load['NASA'][i] = P_pv['NASA'][i] + P_from_bat # прописать P_from_bat
+            E_in_bat_NASA[i] = battery_simple.output_energy(Q_acb, P_bat, E_in_bat_NASA[i-1])
+            P_from_bat = E_in_bat_NASA[i]/dt
+            P_load['NASA'][i] = P_pv['NASA'][i] + P_from_bat
         # WRDC
         if (P_load_max <= P_pv['WRDC'][i]):
             P_bat = P_pv['WRDC'][i] - P_load_max
-            E_in_bat_WRDC[i] = battery_simple.input_energy(Q_acb, P_bat, E_in_bat_WRDC[i-1], dt)
+            P_load['NASA'][i] = P_load_max
+            E_in_bat_WRDC[i] = battery_simple.input_energy(Q_acb, P_bat, E_in_bat_WRDC[i-1])
         else:
-            battery_simple.output_energy(Q_acb, P_bat, dt)        
-    '''
-        if (P_load_max <= P_pv){
-        P_load_out = P_load_max;
-        P_bat = std::min (P_bat_out_max, P_pv - P_load_max);
-    }
-    else{
-        if(P_bat_in_max > (P_load_max - P_pv)){
-            P_bat = P_pv - P_load_max;
-        }
-        else{
-            P_bat = -P_bat_in_max;
-        }
-        P_load_out = -P_bat + P_pv;
-    }
-
-    if (P_load_out < 1E-99){
-        P_load_out = 0;
-    }
-    
-    
-    //		 Рвыхнагр
-			xout[0]=P_load_out;
-//		 Pакк
-			xout[1]=P_bat;
-    '''
+            P_bat = P_load_max - P_pv['WRDC'][i]
+            E_in_bat_WRDC[i] = battery_simple.output_energy(Q_acb, P_bat, E_in_bat_WRDC[i-1])
+            P_from_bat = E_in_bat_WRDC[i]/dt
+            P_load['WRDC'][i] = P_pv['WRDC'][i] + P_from_bat     
     
 class battery_simple:
-    def from_array_P_generator(i):
-        push
-        # возвращает значение Р соответствующее позиции i
+    def P_generator(E_in_last, t, P_bat):
+        return P_bat
     
-    def input_energy(Q_acb, P_bat, i):
+    def input_energy(Q_acb, P_bat, E_in_last):
         # решаем диффур dE/dt = P, находим E_in_bat[i]; dt = 1, P = P_bat (поступающая в батарею мощность на шаге)
-        # E_in = odeint(from_array_P_generator, i, [0, 1])
-        return max(Q_acb, E_in)
+        E_in_cur = odeint(P_generator, E_in_last, t = [0], args = (P_bat))
+        return max(Q_acb, E_in_cur)
     
     def output_energy(Q_acb, P_bat, i):
-        return max(0, E_in - E_out)
-    '''
-    //		 Енактек
-			xout[0]=t;
-//		 Рвхмах
-			xout[1]=(E_bat_max - t*E_bat_max)/dt;
-//		 Рвыхмах
-			xout[2]=t*E_bat_max/dt;
-
-        dtdt = P_bat/E_bat_max;
-        
-        double &dtdt,  // the array containing the derivatives of T which are evaluated
-        double &t,     // the array containing the dependent variables for which the derivatives are evaluated
-    '''
+        E_in_cur = odeint(P_generator, E_in_last, t = [0], args = (-P_bat))
+        return max(0, E_in_cur)
 
 def read_data():
     nasa_data = pd.read_csv('data_sum_r_NASA.txt', sep='\t', encoding='latin1')
