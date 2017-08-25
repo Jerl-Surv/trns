@@ -1,14 +1,18 @@
 import os
 import matplotlib
 import matplotlib.pyplot as plt
+import math
 import pandas as pd
 import numpy as np
 from scipy.optimize import minimize
 from scipy.optimize import minimize_scalar
+from scipy.integrate import odeint
+import Angle_solver as ang_slv
+import Scheme as shm
 
-def count_params():
+def input_radiation_files_generator():
     push
-
+    
 def in_file(Q_acb, P_pv_max, angle, data_base):
     param_file_name = 'Param_Project2_for_' + data_base + '.txt'
     f = open(param_file_name, 'w')
@@ -20,12 +24,10 @@ def in_file(Q_acb, P_pv_max, angle, data_base):
     f.close()
 
 def find_f(P_pv, Q_acb, angle, data_base):
-    in_file(Q_acb, P_pv, angle, data_base)
+    # in_file(Q_acb, P_pv, angle, data_base)
     
-    if (data_base == 'NASA'):
-        os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project2_for_NASA.dck /h')
-    else:
-        os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project2_for_WRDC.dck /h')
+    # запуск схемы
+    shm.main_scheme(P_pv_max, Q_acb, angle, params, station_name)
     
     fixed_df = pd.read_csv('data_' + data_base + '.out', sep='\t', encoding='latin1')
     fixed_df.columns = ['Time', 'Power', 'Nan']
@@ -37,14 +39,9 @@ def find_f(P_pv, Q_acb, angle, data_base):
     
     return f
     
-def find_P_pv_min():
-    fixed_df = pd.read_csv('data_pv_min.out', sep='\t', encoding='latin1')
-    fixed_df.columns = ['Time', 'Power', 'Nan']
-    fixed_df = fixed_df.drop(['Nan'], axis=1)
-    fixed_df = fixed_df.drop(0, axis=0)
-    fixed_df = fixed_df.rename(index = str, columns = {1: 'Power'})      
-
-    P_pv_min = float(sum(fixed_df['Power'])) / len(fixed_df['Power'])
+def find_P_pv_min(station_name, angl_params):
+    power = shm.P_pv_min_scheme(200, shm.data_for_station(station_name)[0], angl_params, station_name)    
+    P_pv_min = [float(sum(power['NASA'])) / len(power['NASA']), float(sum(power['WRDC'])) / len(power['WRDC'])]
     
     return P_pv_min
         
@@ -72,7 +69,7 @@ def find_min(angle_in, P_pv_cur, data_b, f_want, maxit):
     #res = minimize(delta_fun, angle_in, method = 'TNC', bounds = ((0, 90), (0, 2*angle_in[1])), options={'disp': False, 'maxiter': maxit})
     return res
     
-def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):    
+def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number, lattitude):    
  
     Q_arr_nasa = [[0] * dots_number for i in range(len(f_wanted))]
     Q_arr_wrdc = [[0] * dots_number for i in range(len(f_wanted))]
@@ -166,25 +163,19 @@ def main():
     number_of_lines = 10
     number_of_columns = 10
     dots_number = 15 
+    station_name = 'MOSCOW UNIV.'
+    station_info = shm.data_for_station(station_name)
     
-    os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project5.dck /h')
-    P_pv_min = find_P_pv_min()  
+    # input_radiation_files_generator()
+    
+    # расчет угловых параметров
+    angl_params = ang_slv.parameters()
+    
+    P_pv_min = find_P_pv_min(station_name, angl_params)  
 
-    lines_for_different_f(Q, f_wanted, P_pv_min, dots_number)
+    lines_for_different_f(Q, f_wanted, P_pv_min, dots_number, station_name)
 
 main()
-
-#def f(x, y):
-#    return x**2 + y**2
-
-#def delta_f(x_y):
-#    return abs(f(x_y[0], x_y[1]))
-
-#x_y = [-12, 18]
-
-#res = minimize(delta_f, x_y, method = 'SLSQP', bounds = ((-20, 5), (-3, 20)), options={'ftol': 0.02, 'disp': True, 'maxiter': 15})
-
-#print(res.x)
 
 
 

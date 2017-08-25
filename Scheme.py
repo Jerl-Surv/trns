@@ -1,5 +1,6 @@
 from scipy.integrate import odeint
 import pandas as pd
+import Angle_solver as ang_slv
 
 def data_for_station(station_name):
     #Staton name: [latitude, longitude]
@@ -12,9 +13,6 @@ def data_for_station(station_name):
                             'TURUKHANSK': [65.78, 87.95], 'VANAVARA': [60.33, 102.27], 'VERKHOYANSK': [67.55, 133.38], 'VLADIVOSTOK': [43.12, 131.90], 
                             'VOSTOK': [-78.45, 106.87], 'WRANGEL IS.': [70.98, -178.65], 'YAKUTSK': [62.08, 129.75], 'YUZHNO-SAKHALINSK': [46.92, 142.73]})
     return data_frame_stations[station_name]
-
-def file_generator():
-    push
     
 def pv_simple(P_pv_max, radiation):
     return radiation*P_pv_max*0.001
@@ -63,26 +61,30 @@ def read_data():
     nasa_data.columns = ['NASA'] 
     wrdc_data = pd.read_csv('data_sum_r_WRDC.txt', sep='\t', encoding='latin1')
     wrdc_data.columns = ['WRDC']     
-    nasa_and_wrdc_data = nasa_data.merge(wrdc_data, 'left', on='NASA')
+    # nasa_and_wrdc_data = nasa_data.merge(wrdc_data, 'left', on='NASA')
+    nasa_and_wrdc_data = nasa_data.insert(1, 'WRDC', wrdc_data)
     # на выходе данные в виде двух столбцов с названиями 'NASA' и 'WRDC'
     return nasa_and_wrdc_data
 
-def P_pv_for_max_scheme():
-    push
-             
-def main_scheme(P_load_max, Q_acb, angle, params, station_name):
-    # разобраться с передачей в файл данных
+def P_pv_min_scheme(P_load_max, angle, params, station_name):
+    radiation = {}
     dt = 1 # данные с шагом в 1 час
     P_pv_max = 100 # Вт, пиковая мощность фэп
     nasa_and_wrdc_data = read_data() # два столбца: 'NASA' и 'WRDC', сырые данные по радиации из баз данных
-    t_array = [i for i in range(len(nasa_and_wrdc_data['NASA']))]
-    radiation = angle_solver(nasa_and_wrdc_data, angle, data_for_station(station_name)) # два столбца: 'NASA' и 'WRDC'; пересчитанные данные с горизонтали на угол
+    # t_array = [i for i in range(len(nasa_and_wrdc_data['NASA']))]
+    radiation['NASA'] = ang_slv.sum_radiation(nasa_and_wrdc_data['NASA'], angle, data_for_station(station_name)) #столбец 'NASA'; пересчитанные данные с горизонтали на угол
+    radiation['WRDC'] = ang_slv.sum_radiation(nasa_and_wrdc_data['WRDC'], angle, data_for_station(station_name)) #столбец 'WRDC'; пересчитанные данные с горизонтали на угол
+    P_pv = pv_simple(P_pv_max, radiation) # два столбца: 'NASA' и 'WRDC'; выходная мощность с фэп
+    return P_pv
+             
+def main_scheme(P_pv_max, Q_acb, angle, params, station_name):
+    radiation = {}
+    dt = 1 # данные с шагом в 1 час
+    P_load_max = 1 # Вт, пиковая мощность нагрузки
+    nasa_and_wrdc_data = read_data() # два столбца: 'NASA' и 'WRDC', сырые данные по радиации из баз данных
+    # t_array = [i for i in range(len(nasa_and_wrdc_data['NASA']))]
+    radiation['NASA'] = ang_slv.sum_radiation(nasa_and_wrdc_data['NASA'], angle, data_for_station(station_name)) #столбец 'NASA'; пересчитанные данные с горизонтали на угол
+    radiation['WRDC'] = ang_slv.sum_radiation(nasa_and_wrdc_data['WRDC'], angle, data_for_station(station_name)) #столбец 'WRDC'; пересчитанные данные с горизонтали на угол
     P_pv = pv_simple(P_pv_max, radiation) # два столбца: 'NASA' и 'WRDC'; выходная мощность с фэп
     P_load = controler_simple(P_load_max, P_pv, Q_acb) # два столбца: 'NASA' и 'WRDC'; мощность, поступающая на нагрузку
     return P_load
-
-
-
-
-
-    
