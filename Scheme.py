@@ -60,9 +60,11 @@ def read_data():
     nasa_data = pd.read_csv('data_sum_r_NASA.txt', sep='\t', encoding='latin1')
     nasa_data.columns = ['NASA'] 
     wrdc_data = pd.read_csv('data_sum_r_WRDC.txt', sep='\t', encoding='latin1')
-    wrdc_data.columns = ['WRDC']     
-    # nasa_and_wrdc_data = nasa_data.merge(wrdc_data, 'left', on='NASA')
-    nasa_and_wrdc_data = nasa_data.insert(1, 'WRDC', wrdc_data)
+    wrdc_data.columns = ['WRDC']  
+    #nasa_and_wrdc_data = pd.join(wrdc_data, nasa_data)
+    nasa_and_wrdc_data = pd.merge(wrdc_data, nasa_data, left_index=True, right_index=True)
+    #nasa_and_wrdc_data = nasa_data.merge(wrdc_data, 'left', on='NASA')
+    #nasa_and_wrdc_data = nasa_data.insert(1, 'WRDC', wrdc_data)
     # на выходе данные в виде двух столбцов с названиями 'NASA' и 'WRDC'
     return nasa_and_wrdc_data
 

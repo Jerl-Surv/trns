@@ -18,13 +18,15 @@ def parameters():
     params['omega 2'] = np.ravel(omega_year_2)
     return params
 
-def k_t(r_data, years, lattitude): # индекс ясности
+def k_t(r_data, years, lattitude, params): # индекс ясности
     G_sc = 1367 # солнечная постоянная
     # phi - широта местности (рад.)
-    phi = lattitude*math.pi/180   
-    theta_z = math.cos(phi)*math.cos(parameters('delta'))*math.cos(parameters('omega')) + math.sin(phi)*math.sin(parameters('delta'))
+    phi = lattitude*math.pi/180 
+    print(params['delta'])
+    theta_z = np.array([math.cos(phi)*math.cos(params['delta'][i])*math.cos(params['omega'][i]) + math.sin(phi)*math.sin(params['delta'][i]) for i in range(365*24)])
     # заатмосферное излучение
-    G_0 = G_sc*(1 + 0.033*(math.cos(360*n/365)))*math.cos(theta_z)
+    G_cash = np.ravel(np.array([[G_sc*(1 + 0.033*(math.cos(360*n/365))) for i in range(24)] for n in range(365)])) # ошибка
+    G_0 = G_cash*math.cos(theta_z)
     kt = np.array([r_data[i]/G_0 for i in range(years)])
     return kt
     
@@ -109,9 +111,16 @@ def sum_radiation(ratiation_data, angle, station_data):
     #station_data --> [latitude, longitude]
     params = parameters()
     r_data = np.array(ratiation_data)
-    years = np.len(r_data)/365
-    r_data = np.reshape(r_data, (years, 365))
-    k_t = k_t(r_data, years, station_data[0])
+    print(r_data)
+    print(r_data.shape[0])
+    years = int( ( r_data.shape[0] )/(365*24) )
+    out_year = r_data.shape[0] - years*365*24
+    print(out_year)
+    for i in range(out_year):
+        r_data = np.delete(r_data, -1, 0)
+    print(r_data.shape[0] - years*365*24)
+    r_data = np.reshape(r_data, (years, 365*24))
+    kt = k_t(r_data, years, station_data[0], params)
     dif_rad_hor = np.array(diffuse_radiation_on_horiz(r_data[i]))
     dif_rad_angl = dif_rad_hor*coef
     beam_rad_hor = r_data - dif_rad_hor
