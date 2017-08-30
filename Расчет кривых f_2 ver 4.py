@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from scipy.optimize import minimize
-from scipy.optimize import minimize_scalar
+#from scipy import interpolate
 
 def in_file(Q_acb, P_pv_max, angle, data_base):
     param_file_name = 'Param_Project2_for_' + data_base + '.txt'
@@ -50,22 +50,56 @@ def save_plot(Q_1, Q_2, P, f_wanted):
         plt.figure(i+1)
         plt.scatter(Q_1[i], P[i], label = 'NASA')
         plt.plot(Q_1[i], P[i], label = 'NASA')
-        #Q_fit_1 = least_squares(fun_rosenbrock, x0_rosenbrock)
-        #plt.plot(Q_fit_1.x, P[i], label='fitted model NASA')
         plt.scatter(Q_2[i], P[i], label = 'WRDC')
         plt.plot(Q_2[i], P[i], label = 'WRDC')
-        #Q_fit_2 = least_squares(fun_rosenbrock, x0_rosenbrock)
-        #plt.plot(Q_fit_2.x, P[i], label='fitted model WRDC')
         plt.grid(True)
         plt.xlabel(u'Емкость аккумулятора/Пиковая мощность нагрузки, ч')
         plt.ylabel(u'Пиковая мощность фэп/Пиковая мощность нагрузки')
         plt.legend()
         plt.savefig('For f = ' + str(f_wanted[i]) + '.png')
         
-def find_min(angle_in, P_pv_cur, data_b, f_want, maxit):
-    print('Start: ', angle_in[1])
-    delta_fun = lambda angle_Q: min_angle_and_Q(angle_Q, P_pv = P_pv_cur, data_base = data_b, f_wanted = f_want)
-    res = minimize(delta_fun, angle_in, method = 'Nelder-Mead', options={'disp': False, 'maxiter': maxit})
+def threesection(f_wanted, data_base, P_pv, Q_start, angle):
+    angle_down = angle - 15
+    angle_up = angle + 25
+    Q_down = Q_finder(angle_down, data_base, Q_start, P_pv, f_wanted)
+    Q_up = Q_finder(angle_up, data_base, Q_start, P_pv, f_wanted)
+    Q_min = min(Q_down, Q_up)
+    print(Q_min)
+    for i in range(4):
+        angle_new_down = angle_down + (angle_up - angle_down)/3
+        angle_new_up = angle_down + (angle_up - angle_down)*2/3
+        Q_new_down = Q_finder(angle_new_down, data_base, Q_start, P_pv, f_wanted)
+        Q_new_up = Q_finder(angle_new_up, data_base, Q_start, P_pv, f_wanted)
+        Q_array = [[angle_down, Q_down], [angle_new_down, Q_new_down], [angle_new_up, Q_new_up], [angle_up, Q_up]]
+        print(Q_array)
+        Q_min_new = Q_min
+        Q_min_new_2 = 100000
+        for i in range(4):
+            if (Q_array[i][1] == min(Q_min_new, Q_array[i][1])):
+                Q_min_new = Q_array[i][1]
+                Q_down = Q_array[i][1]
+                angle_down = Q_array[i][0]
+                angle_min = Q_array[i][0]
+        for i in range(4):
+            if (Q_array[i][1] == min(Q_min_new_2, Q_array[i][1]) and Q_array[i][1] != Q_min_new):
+                Q_up = Q_array[i][1]
+                Q_min_new_2 = Q_array[i][1]
+                angle_up = Q_array[i][0]
+        if (angle_up < angle_down):
+            angle_up, angle_down = angle_down, angle_up
+            Q_down, Q_up = Q_up, Q_down
+        Q_min = Q_min_new
+    return [angle_min, Q_min]
+
+def Q_finder(angle_in, data_base, Q_start, P_pv, f_wanted):
+    res = find_min(angle_in, Q_start, P_pv, data_base, f_wanted, 0.0001)           
+    Q = res.x[0]
+    return Q
+        
+def find_min(angle_in, Q_start, P_pv_cur, data_b, f_want, error):
+    print('Start: ', angle_in)
+    delta_fun = lambda Q: min_Q(Q, angle = angle_in, P_pv = P_pv_cur, data_base = data_b, f_wanted = f_want)
+    res = minimize(delta_fun, Q_start, method = 'Nelder-Mead', options={'disp': True, 'fatol': error})
     #res = minimize(delta_fun, angle_in, method = 'TNC', bounds = ((0, 90), (0, 2*angle_in[1])), options={'disp': False, 'maxiter': maxit})
     return res
     
@@ -91,59 +125,35 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
         for j in range(len(f_wanted)):
             print('f =', f_wanted[j])
             print('\n')
-            #  if (i != 0 and P_pv_arr[j][i])
             P_pv_arr[j][i] = ( (1 + 0.00001*i)*P_pv_min*f_wanted[j] )
             if f_wanted[j] < 1:
                 result = open('Result_file_for_f_0_' + str(f_wanted[j]*100) + '.txt', 'a')
             else:
                 result = open('Result_file_for_f_1_0.txt', 'a')
             
-            angle_in = [57, 0.8*Q_start_nasa[j][i]*f_wanted[j]]
-            res = find_min(angle_in, P_pv_arr[j][i], 'NASA', f_wanted[j], 10)           
+            angle_in = threesection(f_wanted[j], 'NASA', P_pv_arr[j][i], Q_start_nasa[j][i], 57)
+                
+            Q_arr_nasa[j][i] = angle_in[1]
+            Q_start_nasa[j][i+1] = angle_in[1]
+            print('Result NASA: ', angle_in[0], angle_in[1])             
+                    
+            angle_in = threesection(f_wanted[j], 'WRDC', P_pv_arr[j][i], Q_start_wrdc[j][i], 57)           
             
-            count_error_1 = False
-            count_error_2 = False
-            if np.all(res.fun > 0.01 and i != 0 and count_error_1 == False):
-                angle_in = [57, 0.2*Q_start_nasa[j][i]*f_wanted[j]]
-                res = find_min(angle_in, P_pv_arr[j][i], 'NASA', f_wanted[j], 20)
-                count_error_2 = True
-            if np.all(res.fun > 0.001 and i != 0 and count_error_1 == False):
-                angle_in = [57, 0.05*Q_start_nasa[j][i]*f_wanted[j]]
-                res = find_min(angle_in, P_pv_arr[j][i], 'NASA', f_wanted[j], 30)
-                count_error_1 = True            
-            
-            Q_arr_nasa[j][i] = res.x[1]
-            Q_start_nasa[j][i+1] = res.x[1]
-            print('Result NASA: ', res.x[0], res.x[1], res.fun)             
-            
-            angle_in = [57, 0.8*Q_start_wrdc[j][i]*f_wanted[j]]
-            res = find_min(angle_in, P_pv_arr[j][i], 'WRDC', f_wanted[j], 10)
-            
-            count_error_1 = False
-            count_error_2 = False
-            if np.all(res.fun > 0.01 and i != 0 and count_error_1 == False):
-                angle_in = [57, 0.2*Q_start_wrdc[j][i]*f_wanted[j]]
-                res = find_min(angle_in, P_pv_arr[j][i], 'WRDC', f_wanted[j], 20)
-                count_error_2 = True
-            if np.all(res.fun > 0.001 and i != 0 and count_error_1 == False):
-                angle_in = [57, 0.05*Q_start_wrdc[j][i]*f_wanted[j]]
-                res = find_min(angle_in, P_pv_arr[j][i], 'WRDC', f_wanted[j], 30)
-                count_error_1 = True        
-            
-            Q_arr_wrdc[j][i] = res.x[1]
-            Q_start_wrdc[j][i+1] = res.x[1]  
-            print('Result WRDC: ', res.x[0], res.x[1], res.fun)       
+            Q_arr_wrdc[j][i] = angle_in[1]
+            Q_start_wrdc[j][i+1] = angle_in[1] 
+            print('Result WRDC: ', angle_in[0], angle_in[1])       
             
             P_pv_arr[j][i] /= 3.6
             Q_arr_nasa[j][i] /= 3.6
             Q_arr_wrdc[j][i] /= 3.6
+            print(P_pv_arr[j][i])
             result.write("%s " % round(P_pv_arr[j][i], 4))
             result.write("%s " % round(Q_arr_nasa[j][i], 4))
             result.write("%s \n" % round(Q_arr_wrdc[j][i], 4))
             
-            if (max_f_difference[j] < abs(res.fun)):
-                max_f_difference[j] = abs(res.fun) 
-            result.write("%s \n" % round(max_f_difference[j], 5))
+            #if (max_f_difference[j] < abs(res.fun)):
+                #max_f_difference[j] = abs(res.fun) 
+            #result.write("%s \n" % round(max_f_difference[j], 5))
             
             result.close()
             
@@ -153,16 +163,18 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
         
     print('Finish!')
 
-def min_angle_and_Q(angle_Q, P_pv, data_base, f_wanted):
-    return abs(f_wanted - find_f(P_pv, angle_Q[1], angle_Q[0], data_base))
+def min_Q(Q, angle, P_pv, data_base, f_wanted):
+    # print(Q[0]) и хз, почему это массив
+    return abs(f_wanted - find_f(P_pv, Q[0], angle, data_base))
 
 def main():
     print('Start')
     Q = 130 #емкость аккумулятора в кДж
-    f_wanted = [0.999, 0.995, 0.99, 0.95]
+    #f_wanted = [0.999, 0.995, 0.99, 0.95]
+    f_wanted = [0.999]
     number_of_lines = 10
     number_of_columns = 10
-    dots_number = 15 
+    dots_number = 5
     
     os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project5.dck /h')
     P_pv_min = find_P_pv_min()  
