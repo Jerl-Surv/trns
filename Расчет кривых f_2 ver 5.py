@@ -177,7 +177,7 @@ def main():
     
     P_pv_min = find_P_pv_min(station_name, angl_params) # формат вывода (???)
 
-    lines_for_different_f(Q, f_wanted, P_pv_min, dots_number, station_name, ) # разобраться с передачей данных
+    lines_for_different_f(Q, f_wanted, P_pv_min, dots_number, station_name, ) # разобраться с передачей данных 
 
 main()
 
