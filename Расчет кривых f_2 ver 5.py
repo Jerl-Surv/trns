@@ -10,6 +10,8 @@ from scipy.integrate import odeint
 import Angle_solver as ang_slv
 import Scheme as shm
 
+params = ang_slv.parameters()
+
 def input_radiation_files_generator():
     push
     
@@ -23,11 +25,12 @@ def in_file(Q_acb, P_pv_max, angle, data_base):
     
     f.close()
 
-def find_f(P_pv, Q_acb, angle, data_base):
+def find_f(P_pv, Q_acb, angle, data_base, station_name):
+    global params
     # in_file(Q_acb, P_pv, angle, data_base)
     
     # запуск схемы
-    shm.main_scheme(P_pv_max, Q_acb, angle, params, station_name)
+    shm.main_scheme(P_pv, Q_acb, angle, params, station_name)
     
     fixed_df = pd.read_csv('data_' + data_base + '.out', sep='\t', encoding='latin1')
     fixed_df.columns = ['Time', 'Power', 'Nan']
@@ -62,14 +65,14 @@ def save_plot(Q_1, Q_2, P, f_wanted):
         plt.legend()
         plt.savefig('For f = ' + str(f_wanted[i]) + '.png')
         
-def find_min(angle_in, P_pv_cur, data_b, f_want, maxit):
+def find_min(angle_in, P_pv_cur, data_b, f_want, maxit, station_name):
     print('Start: ', angle_in[1])
-    delta_fun = lambda angle_Q: min_angle_and_Q(angle_Q, P_pv = P_pv_cur, data_base = data_b, f_wanted = f_want)
+    delta_fun = lambda angle_Q: min_angle_and_Q(angle_Q, P_pv = P_pv_cur, data_base = data_b, f_wanted = f_want, station_name = station_name)
     res = minimize(delta_fun, angle_in, method = 'Nelder-Mead', options={'disp': False, 'maxiter': maxit})
     #res = minimize(delta_fun, angle_in, method = 'TNC', bounds = ((0, 90), (0, 2*angle_in[1])), options={'disp': False, 'maxiter': maxit})
     return res
     
-def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number, lattitude):    
+def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number, lattitude, station_name):    
  
     Q_arr_nasa = [[0] * dots_number for i in range(len(f_wanted))]
     Q_arr_wrdc = [[0] * dots_number for i in range(len(f_wanted))]
@@ -92,24 +95,25 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number, lattitude):
             print('f =', f_wanted[j])
             print('\n')
             #  if (i != 0 and P_pv_arr[j][i])
-            P_pv_arr[j][i] = ( (1 + 0.00001*i)*P_pv_min*f_wanted[j] )
+            print(i, j, P_pv_min, f_wanted[j])
+            P_pv_arr[j][i] = ( (1 + 0.00001*i)*P_pv_min[j]*f_wanted[j] )
             if f_wanted[j] < 1:
                 result = open('Result_file_for_f_0_' + str(f_wanted[j]*100) + '.txt', 'a')
             else:
                 result = open('Result_file_for_f_1_0.txt', 'a')
             
             angle_in = [57, 0.8*Q_start_nasa[j][i]*f_wanted[j]]
-            res = find_min(angle_in, P_pv_arr[j][i], 'NASA', f_wanted[j], 10)           
+            res = find_min(angle_in, P_pv_arr[j][i], 'NASA', f_wanted[j], 10, station_name)           
             
             count_error_1 = False
             count_error_2 = False
             if np.all(res.fun > 0.01 and i != 0 and count_error_1 == False):
                 angle_in = [57, 0.2*Q_start_nasa[j][i]*f_wanted[j]]
-                res = find_min(angle_in, P_pv_arr[j][i], 'NASA', f_wanted[j], 20)
+                res = find_min(angle_in, P_pv_arr[j][i], 'NASA', f_wanted[j], 20, station_name)
                 count_error_2 = True
             if np.all(res.fun > 0.001 and i != 0 and count_error_1 == False):
                 angle_in = [57, 0.05*Q_start_nasa[j][i]*f_wanted[j]]
-                res = find_min(angle_in, P_pv_arr[j][i], 'NASA', f_wanted[j], 30)
+                res = find_min(angle_in, P_pv_arr[j][i], 'NASA', f_wanted[j], 30, station_name)
                 count_error_1 = True            
             
             Q_arr_nasa[j][i] = res.x[1]
@@ -117,17 +121,17 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number, lattitude):
             print('Result NASA: ', res.x[0], res.x[1], res.fun)             
             
             angle_in = [57, 0.8*Q_start_wrdc[j][i]*f_wanted[j]]
-            res = find_min(angle_in, P_pv_arr[j][i], 'WRDC', f_wanted[j], 10)
+            res = find_min(angle_in, P_pv_arr[j][i], 'WRDC', f_wanted[j], 10, station_name)
             
             count_error_1 = False
             count_error_2 = False
             if np.all(res.fun > 0.01 and i != 0 and count_error_1 == False):
                 angle_in = [57, 0.2*Q_start_wrdc[j][i]*f_wanted[j]]
-                res = find_min(angle_in, P_pv_arr[j][i], 'WRDC', f_wanted[j], 20)
+                res = find_min(angle_in, P_pv_arr[j][i], 'WRDC', f_wanted[j], 20, station_name)
                 count_error_2 = True
             if np.all(res.fun > 0.001 and i != 0 and count_error_1 == False):
                 angle_in = [57, 0.05*Q_start_wrdc[j][i]*f_wanted[j]]
-                res = find_min(angle_in, P_pv_arr[j][i], 'WRDC', f_wanted[j], 30)
+                res = find_min(angle_in, P_pv_arr[j][i], 'WRDC', f_wanted[j], 30, station_name)
                 count_error_1 = True        
             
             Q_arr_wrdc[j][i] = res.x[1]
@@ -153,13 +157,13 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number, lattitude):
         
     print('Finish!')
 
-def min_angle_and_Q(angle_Q, P_pv, data_base, f_wanted):
-    return abs(f_wanted - find_f(P_pv, angle_Q[1], angle_Q[0], data_base))
+def min_angle_and_Q(angle_Q, P_pv, data_base, f_wanted, station_name):
+    return abs(f_wanted - find_f(P_pv, angle_Q[1], angle_Q[0], data_base, station_name))
 
 def main():
     print('Start')
     Q = 130 #емкость аккумулятора в кДж
-    f_wanted = [0.999, 0.995, 0.99, 0.95]
+    f_wanted = [0.999]
     number_of_lines = 10
     number_of_columns = 10
     dots_number = 15 
@@ -171,9 +175,9 @@ def main():
     # расчет угловых параметров
     angl_params = ang_slv.parameters()
     
-    P_pv_min = find_P_pv_min(station_name, angl_params)  
+    P_pv_min = find_P_pv_min(station_name, angl_params) # формат вывода (???)
 
-    lines_for_different_f(Q, f_wanted, P_pv_min, dots_number, station_name)
+    lines_for_different_f(Q, f_wanted, P_pv_min, dots_number, station_name, ) # разобраться с передачей данных
 
 main()
 

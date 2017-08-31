@@ -1,6 +1,7 @@
 from scipy.integrate import odeint
 import pandas as pd
 import Angle_solver as ang_slv
+import numpy as np
 
 def data_for_station(station_name):
     #Staton name: [latitude, longitude]
@@ -15,7 +16,13 @@ def data_for_station(station_name):
     return data_frame_stations[station_name]
     
 def pv_simple(P_pv_max, radiation):
-    return radiation*P_pv_max*0.001
+    P_pv = {}
+    radiation_nasa = np.array(radiation.get('NASA'))
+    radiation_wrdc = np.array(radiation.get('WRDC'))
+    print(radiation_wrdc)
+    P_pv['NASA'] = radiation_nasa*P_pv_max/1000
+    P_pv['WRDC'] = radiation_wrdc*P_pv_max/1000
+    return P_pv
     
 def controler_simple(P_load_max, P_pv, Q_acb, dt):
     E_in_bat_NASA = [0 for i in range(len(nasa_and_wrdc_data['NASA']) + 1)]
