@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from scipy.optimize import minimize
-#from scipy import interpolate
 
 def in_file(Q_acb, P_pv_max, angle, data_base):
     param_file_name = 'Param_Project2_for_' + data_base + '.txt'
@@ -58,41 +57,17 @@ def save_plot(Q_1, Q_2, P, f_wanted):
         plt.legend()
         plt.savefig('For f = ' + str(f_wanted[i]) + '.png')
         
-def threesection(f_wanted, data_base, P_pv, Q_start, angle):
+def angle_for_Q_min(f_wanted, data_base, P_pv, Q_start, angle):
     angle_down = angle - 15
-    angle_up = angle + 25
-    Q_down = Q_finder(angle_down, data_base, Q_start, P_pv, f_wanted)
-    Q_up = Q_finder(angle_up, data_base, Q_start, P_pv, f_wanted)
-    Q_min = min(Q_down, Q_up)
-    print(Q_min)
-    for i in range(4):
-        angle_new_down = angle_down + (angle_up - angle_down)/3
-        angle_new_up = angle_down + (angle_up - angle_down)*2/3
-        Q_new_down = Q_finder(angle_new_down, data_base, Q_start, P_pv, f_wanted)
-        Q_new_up = Q_finder(angle_new_up, data_base, Q_start, P_pv, f_wanted)
-        Q_array = [[angle_down, Q_down], [angle_new_down, Q_new_down], [angle_new_up, Q_new_up], [angle_up, Q_up]]
-        print(Q_array)
-        Q_min_new = Q_min
-        Q_min_new_2 = 100000
-        for i in range(4):
-            if (Q_array[i][1] == min(Q_min_new, Q_array[i][1])):
-                Q_min_new = Q_array[i][1]
-                Q_down = Q_array[i][1]
-                angle_down = Q_array[i][0]
-                angle_min = Q_array[i][0]
-        for i in range(4):
-            if (Q_array[i][1] == min(Q_min_new_2, Q_array[i][1]) and Q_array[i][1] != Q_min_new):
-                Q_up = Q_array[i][1]
-                Q_min_new_2 = Q_array[i][1]
-                angle_up = Q_array[i][0]
-        if (angle_up < angle_down):
-            angle_up, angle_down = angle_down, angle_up
-            Q_down, Q_up = Q_up, Q_down
-        Q_min = Q_min_new
-    return [angle_min, Q_min]
+    angle_up = angle + 20
+    Q_min_find = lambda angle_in: Q_finder(angle_in, data_base = data_base, Q_start = Q_start, P_pv = P_pv, f_wanted = f_wanted)
+    print(angle)
+    res = minimize(Q_min_find, angle, method = 'SLSQP', bounds = ((angle_down, angle_up),), options={'disp': True, 'ftol': 0.001})
+    return [res.x, res.fun]
+
 
 def Q_finder(angle_in, data_base, Q_start, P_pv, f_wanted):
-    res = find_min(angle_in, Q_start, P_pv, data_base, f_wanted, 0.0001)           
+    res = find_min(angle_in[0], Q_start, P_pv, data_base, f_wanted, 0.0001)           
     Q = res.x[0]
     return Q
         
@@ -131,13 +106,13 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
             else:
                 result = open('Result_file_for_f_1_0.txt', 'a')
             
-            angle_in = threesection(f_wanted[j], 'NASA', P_pv_arr[j][i], Q_start_nasa[j][i], 57)
+            angle_in = angle_for_Q_min(f_wanted[j], 'NASA', P_pv_arr[j][i], Q_start_nasa[j][i], 57)
                 
             Q_arr_nasa[j][i] = angle_in[1]
             Q_start_nasa[j][i+1] = angle_in[1]
             print('Result NASA: ', angle_in[0], angle_in[1])             
                     
-            angle_in = threesection(f_wanted[j], 'WRDC', P_pv_arr[j][i], Q_start_wrdc[j][i], 57)           
+            angle_in = angle_for_Q_min(f_wanted[j], 'WRDC', P_pv_arr[j][i], Q_start_wrdc[j][i], 57)           
             
             Q_arr_wrdc[j][i] = angle_in[1]
             Q_start_wrdc[j][i+1] = angle_in[1] 
@@ -150,10 +125,6 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
             result.write("%s " % round(P_pv_arr[j][i], 4))
             result.write("%s " % round(Q_arr_nasa[j][i], 4))
             result.write("%s \n" % round(Q_arr_wrdc[j][i], 4))
-            
-            #if (max_f_difference[j] < abs(res.fun)):
-                #max_f_difference[j] = abs(res.fun) 
-            #result.write("%s \n" % round(max_f_difference[j], 5))
             
             result.close()
             
