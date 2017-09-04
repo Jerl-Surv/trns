@@ -120,14 +120,10 @@ def sum_radiation(ratiation_data, angle, station_data):
     params = parameters()
     coef = (1 + math.cos(angle))*0.5
     r_data = np.array(ratiation_data)
-    print(r_data)
-    print(r_data.shape[0])
     years = int( ( r_data.shape[0] )/(365*24) )
     out_year = r_data.shape[0] - years*365*24
-    print(out_year)
     for i in range(out_year):
         r_data = np.delete(r_data, -1, 0)
-    print(r_data.shape[0] - years*365*24)
     r_data = np.reshape(r_data, (years, 365*24))
     kt = k_t(r_data, years, station_data[0], params)
     dif_rad_hor = np.array(diffuse_radiation_on_horiz(r_data, years, kt)) # diff_rad = np.ones((years, 365*24))
@@ -136,6 +132,7 @@ def sum_radiation(ratiation_data, angle, station_data):
     beam_rad_angl = np.array([R_b(angle, station_data[0], params)*beam_rad_hor[i] for i in range(years)])
     sum_rad_angle = dif_rad_angl + beam_rad_angl
     return np.ravel(sum_rad_angle)
+
 
 
 

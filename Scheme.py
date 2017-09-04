@@ -19,33 +19,38 @@ def pv_simple(P_pv_max, radiation):
     P_pv = {}
     radiation_nasa = np.array(radiation.get('NASA'))
     radiation_wrdc = np.array(radiation.get('WRDC'))
-    print(radiation_wrdc)
     P_pv['NASA'] = radiation_nasa*P_pv_max/1000
     P_pv['WRDC'] = radiation_wrdc*P_pv_max/1000
     return P_pv
     
-def controler_simple(P_load_max, P_pv, Q_acb, dt):
-    E_in_bat_NASA = [0 for i in range(len(nasa_and_wrdc_data['NASA']) + 1)]
-    E_in_bat_WRDC = [0 for i in range(len(nasa_and_wrdc_data['WRDC']) + 1)]
+def controler_simple(P_load_max, P_pv, Q_acb):
+    dt = 1
+    E_in_bat_NASA = [0 for i in range(len(P_pv['NASA']) + 1)]
+    E_in_bat_WRDC = [0 for i in range(len(P_pv['WRDC']) + 1)]
     P_load = P_pv
-    for i in range(len(nasa_and_wrdc_data['NASA']) + 1):
+    for i in range(len(P_pv['NASA']) + 1): 
+        print('iteration', i)
         # NASA
         if (P_load_max <= P_pv['NASA'][i]):
             P_bat = P_pv['NASA'][i] - P_load_max
             P_load['NASA'][i] = P_load_max
+            print(E_in_bat_NASA[:20])
             E_in_bat_NASA[i] = battery_simple.input_energy(Q_acb, P_bat, E_in_bat_NASA[i-1])
         else:
             P_bat = P_load_max - P_pv['NASA'][i]
+            print(E_in_bat_NASA[:20])
             E_in_bat_NASA[i] = battery_simple.output_energy(Q_acb, P_bat, E_in_bat_NASA[i-1])
             P_from_bat = E_in_bat_NASA[i]/dt
             P_load['NASA'][i] = P_pv['NASA'][i] + P_from_bat
         # WRDC
         if (P_load_max <= P_pv['WRDC'][i]):
             P_bat = P_pv['WRDC'][i] - P_load_max
-            P_load['NASA'][i] = P_load_max
+            P_load['WRDC'][i] = P_load_max
+            print(E_in_bat_WRDC[:20])
             E_in_bat_WRDC[i] = battery_simple.input_energy(Q_acb, P_bat, E_in_bat_WRDC[i-1])
         else:
             P_bat = P_load_max - P_pv['WRDC'][i]
+            print(E_in_bat_WRDC[:20])
             E_in_bat_WRDC[i] = battery_simple.output_energy(Q_acb, P_bat, E_in_bat_WRDC[i-1])
             P_from_bat = E_in_bat_WRDC[i]/dt
             P_load['WRDC'][i] = P_pv['WRDC'][i] + P_from_bat     
@@ -56,11 +61,13 @@ class battery_simple:
     
     def input_energy(Q_acb, P_bat, E_in_last):
         # решаем диффур dE/dt = P, находим E_in_bat[i]; dt = 1, P = P_bat (поступающая в батарею мощность на шаге)
-        E_in_cur = odeint(P_generator, E_in_last, t = [0], args = (P_bat))
+        print('E_in_last in: ', E_in_last)
+        E_in_cur = odeint(battery_simple.P_generator, E_in_last, t = [0], args = (P_bat,))
         return max(Q_acb, E_in_cur)
     
-    def output_energy(Q_acb, P_bat, i):
-        E_in_cur = odeint(P_generator, E_in_last, t = [0], args = (-P_bat))
+    def output_energy(Q_acb, P_bat, E_in_last):
+        print('E_in_last out: ', E_in_last)
+        E_in_cur = odeint(battery_simple.P_generator, E_in_last, t = [0], args = (-P_bat,))
         return max(0, E_in_cur)
 
 def read_data():
@@ -93,7 +100,11 @@ def main_scheme(P_pv_max, Q_acb, angle, params, station_name):
     nasa_and_wrdc_data = read_data() # два столбца: 'NASA' и 'WRDC', сырые данные по радиации из баз данных
     # t_array = [i for i in range(len(nasa_and_wrdc_data['NASA']))]
     radiation['NASA'] = ang_slv.sum_radiation(nasa_and_wrdc_data['NASA'], angle, data_for_station(station_name)) #столбец 'NASA'; пересчитанные данные с горизонтали на угол
+    print('Radiation NASA: ', radiation['NASA'])
     radiation['WRDC'] = ang_slv.sum_radiation(nasa_and_wrdc_data['WRDC'], angle, data_for_station(station_name)) #столбец 'WRDC'; пересчитанные данные с горизонтали на угол
+    print('Radiation WRDC: ', radiation['WRDC'])
     P_pv = pv_simple(P_pv_max, radiation) # два столбца: 'NASA' и 'WRDC'; выходная мощность с фэп
+    print('P_pv', P_pv)
     P_load = controler_simple(P_load_max, P_pv, Q_acb) # два столбца: 'NASA' и 'WRDC'; мощность, поступающая на нагрузку
+    print('P_load: ', P_load)
     return P_load
