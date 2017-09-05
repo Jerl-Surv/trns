@@ -84,10 +84,7 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number, station_name):
     max_f_difference = [0 for i in range(len(f_wanted))]
     
     for i in range(len(f_wanted)):
-        if f_wanted[i] < 1:
-            result = open('Result_file_for_f_0_' + str(f_wanted[i]*1000) + '.txt', 'w')
-        else:
-            result = open('Result_file_for_f_1_0.txt', 'w')  
+        result = open('Result_file_for_f_0_' + str(int(f_wanted[i]*1000)) + '.txt', 'w') 
         result.write('Мощность_ФЭМ_nasa, Мощность_ФЭМ_wrdc, Емкость_АКБ_nasa,_ч, Емкость_АКБ_wrdc,_ч\n')
         result.close()
         
@@ -96,14 +93,9 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number, station_name):
         for j in range(len(f_wanted)):
             print('f =', f_wanted[j])
             print('\n')
-            #  if (i != 0 and P_pv_arr[j][i])
-            #print(i, j, P_pv_min, f_wanted[j])
             P_pv_arr_NASA[j][i] = ( (1 + 0.00001*i)*P_pv_min[0]*f_wanted[j] )
             P_pv_arr_WRDC[j][i] = ( (1 + 0.00001*i)*P_pv_min[1]*f_wanted[j] )
-            if f_wanted[j] < 1:
-                result = open('Result_file_for_f_0_' + str(f_wanted[j]*100) + '.txt', 'a')
-            else:
-                result = open('Result_file_for_f_1_0.txt', 'a')
+            result = open('Result_file_for_f_0_' + str(int(f_wanted[j]*1000)) + '.txt', 'a')
             
             angle_in = [57, 0.8*Q_start_nasa[j][i]*f_wanted[j]]
             res = find_min(angle_in, P_pv_arr_NASA[j][i], 'NASA', f_wanted[j], 10, station_name)           
