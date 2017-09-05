@@ -62,7 +62,8 @@ def angle_for_Q_min(f_wanted, data_base, P_pv, Q_start, angle):
     angle_up = angle + 20
     Q_min_find = lambda angle_in: Q_finder(angle_in, data_base = data_base, Q_start = Q_start, P_pv = P_pv, f_wanted = f_wanted)
     print(angle)
-    res = minimize(Q_min_find, angle, method = 'SLSQP', bounds = ((angle_down, angle_up),), options={'disp': True, 'ftol': 0.001})
+    # bounds = ((angle_down, angle_up),)
+    res = minimize(Q_min_find, angle, method = 'Nelder-Mead', options={'disp': True, 'xatol': 0.5, 'maxiter': 5})
     return [res.x, res.fun]
 
 
@@ -88,10 +89,7 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
     max_f_difference = [0 for i in range(len(f_wanted))]
     
     for i in range(len(f_wanted)):
-        if f_wanted[i] < 1:
-            result = open('Result_file_for_f_0_' + str(f_wanted[i]*1000) + '.txt', 'w')
-        else:
-            result = open('Result_file_for_f_1_0.txt', 'w')  
+        result = open('Result_file_for_f_0_' + str(f_wanted[i]*1000) + '.txt', 'w')   
         result.write('Мощность_ФЭМ, Емкость_АКБ_nasa,_ч, Емкость_АКБ_wrdc,_ч\n')
         result.close()
         
@@ -100,11 +98,9 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
         for j in range(len(f_wanted)):
             print('f =', f_wanted[j])
             print('\n')
-            P_pv_arr[j][i] = ( (1 + 0.00001*i)*P_pv_min*f_wanted[j] )
-            if f_wanted[j] < 1:
-                result = open('Result_file_for_f_0_' + str(f_wanted[j]*100) + '.txt', 'a')
-            else:
-                result = open('Result_file_for_f_1_0.txt', 'a')
+            P_pv_arr[j][i] = ( (0.999 + 0.001*i)*P_pv_min*f_wanted[j] )
+            
+            result = open('Result_file_for_f_0_' + str(f_wanted[j]*1000) + '.txt', 'a')
             
             angle_in = angle_for_Q_min(f_wanted[j], 'NASA', P_pv_arr[j][i], Q_start_nasa[j][i], 57)
                 
@@ -122,9 +118,9 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
             Q_arr_nasa[j][i] /= 3.6
             Q_arr_wrdc[j][i] /= 3.6
             print(P_pv_arr[j][i])
-            result.write("%s " % round(P_pv_arr[j][i], 4))
-            result.write("%s " % round(Q_arr_nasa[j][i], 4))
-            result.write("%s \n" % round(Q_arr_wrdc[j][i], 4))
+            result.write("%s\t" % round(P_pv_arr[j][i], 4))
+            result.write("%s\t" % round(Q_arr_nasa[j][i], 4))
+            result.write("%s\n" % round(Q_arr_wrdc[j][i], 4))
             
             result.close()
             
