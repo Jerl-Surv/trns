@@ -23,13 +23,12 @@ def pv_simple(P_pv_max, radiation):
     P_pv['WRDC'] = radiation_wrdc*P_pv_max/1000
     return P_pv
     
-def controler_simple(P_load_max, P_pv, Q_acb):
+def controler_simple(P_load_max, P_pv, Q_acb): # P_load_max - 1Вт, число, P_pv - мощность с фэп, массив, Q_acb - емкость акб, число
     dt = 1
     E_in_bat_NASA = [Q_acb for i in range(len(P_pv['NASA']) + 1)]
     E_in_bat_WRDC = [Q_acb for i in range(len(P_pv['WRDC']) + 1)]
     P_load = P_pv
     for i in range(len(P_pv['NASA'])): 
-        print('iteration', i)
         # NASA
         if (P_load_max <= P_pv['NASA'][i]):
             P_bat = P_pv['NASA'][i] - P_load_max
@@ -39,7 +38,7 @@ def controler_simple(P_load_max, P_pv, Q_acb):
             P_bat = P_load_max - P_pv['NASA'][i]
             E_in_bat_NASA[i+1] = battery_simple.output_energy(Q_acb, P_bat, E_in_bat_NASA[i-1])
             P_from_bat = E_in_bat_NASA[i+1]/dt
-            P_load['NASA'][i] = P_pv['NASA'][i] + P_from_bat
+            P_load['NASA'][i] = min(P_pv['NASA'][i] + P_from_bat, P_load_max)
         # WRDC
         if (P_load_max <= P_pv['WRDC'][i]):
             P_bat = P_pv['WRDC'][i] - P_load_max
@@ -49,7 +48,7 @@ def controler_simple(P_load_max, P_pv, Q_acb):
             P_bat = P_load_max - P_pv['WRDC'][i]
             E_in_bat_WRDC[i+1] = battery_simple.output_energy(Q_acb, P_bat, E_in_bat_WRDC[i-1])
             P_from_bat = E_in_bat_WRDC[i+1]/dt
-            P_load['WRDC'][i] = P_pv['WRDC'][i] + P_from_bat   
+            P_load['WRDC'][i] = min(P_pv['WRDC'][i] + P_from_bat, P_load_max)   
     
     return P_load
     
@@ -113,11 +112,11 @@ def main_scheme(P_pv_max, Q_acb, angle, params, station_name):
     nasa_and_wrdc_data = read_data() # два столбца: 'NASA' и 'WRDC', сырые данные по радиации из баз данных
     # t_array = [i for i in range(len(nasa_and_wrdc_data['NASA']))]
     radiation['NASA'] = ang_slv.sum_radiation(nasa_and_wrdc_data['NASA'], angle, data_for_station(station_name)) #столбец 'NASA'; пересчитанные данные с горизонтали на угол
-    print('Radiation NASA: ', radiation['NASA'])
+    print('Radiation NASA: ', radiation['NASA'][:5])
     radiation['WRDC'] = ang_slv.sum_radiation(nasa_and_wrdc_data['WRDC'], angle, data_for_station(station_name)) #столбец 'WRDC'; пересчитанные данные с горизонтали на угол
-    print('Radiation WRDC: ', radiation['WRDC'])
+    print('Radiation WRDC: ', radiation['WRDC'][:5])
     P_pv = pv_simple(P_pv_max, radiation) # два столбца: 'NASA' и 'WRDC'; выходная мощность с фэп
-    print('P_pv', P_pv)
+    print('P_pv', P_pv[:5])
     P_load = controler_simple(P_load_max, P_pv, Q_acb) # два столбца: 'NASA' и 'WRDC'; мощность, поступающая на нагрузку
     print('P_load: ', P_load)
     return P_load
