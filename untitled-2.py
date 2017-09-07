@@ -41,7 +41,7 @@ def controler_simple(P_load_max, P_pv, Q_acb):
             P_bat = P_load_max - P_pv['NASA'][i]
             E_in_bat_NASA[i+1] = battery_simple.output_energy(Q_acb, P_bat, E_in_bat_NASA[i-1])
             P_from_bat = E_in_bat_NASA[i+1]/dt
-            P_load['NASA'][i] = P_pv['NASA'][i] + P_from_bat
+            P_load['NASA'][i] = round(min(P_pv['NASA'][i] + P_from_bat, P_load_max), 2)
         # WRDC
         if (P_load_max <= P_pv['WRDC'][i]):
             P_bat = P_pv['WRDC'][i] - P_load_max
@@ -51,7 +51,7 @@ def controler_simple(P_load_max, P_pv, Q_acb):
             P_bat = P_load_max - P_pv['WRDC'][i]
             E_in_bat_WRDC[i+1] = battery_simple.output_energy(Q_acb, P_bat, E_in_bat_WRDC[i-1])
             P_from_bat = E_in_bat_WRDC[i+1]/dt
-            P_load['WRDC'][i] = P_pv['WRDC'][i] + P_from_bat 
+            P_load['WRDC'][i] = round(min(P_pv['WRDC'][i] + P_from_bat, P_load_max), 2)
     return P_load
     
 class battery_simple:
@@ -109,7 +109,7 @@ def main_scheme(P_pv_max, Q_acb, angle, params, station_name):
     radiation = {}
     dt = 1 # данные с шагом в 1 час
     P_load_max = 1 # Вт, пиковая мощность нагрузки
-    nasa_and_wrdc_data = read_data() # два столбца: 'NASA' и 'WRDC', сырые данные по радиации из баз данных
+    nasa_and_wrdc_data = read_data()/3.6 # два столбца: 'NASA' и 'WRDC', сырые данные по радиации из баз данных, в Вт/м^2
     # t_array = [i for i in range(len(nasa_and_wrdc_data['NASA']))]
     radiation['NASA'] = ang_slv.sum_radiation(nasa_and_wrdc_data['NASA'], angle, data_for_station(station_name)) #столбец 'NASA'; пересчитанные данные с горизонтали на угол
     radiation['WRDC'] = ang_slv.sum_radiation(nasa_and_wrdc_data['WRDC'], angle, data_for_station(station_name)) #столбец 'WRDC'; пересчитанные данные с горизонтали на угол
@@ -147,15 +147,15 @@ def find_P_load(P_pv, Q_acb, angle, data_base):
 
 now_date = str(datetime.time(datetime.now()))
 now_date_0 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
-
-P_load_trns_nasa = find_P_load(110, 125, 57, 'NASA')
-P_load_trns_wrdc = find_P_load(110, 125, 57, 'WRDC')
+# TRNSYS
+P_load_trns_nasa = find_P_load(1, 2, 57, 'NASA')
+P_load_trns_wrdc = find_P_load(1, 2, 57, 'WRDC')
 
 now_date = str(datetime.time(datetime.now()))
 now_date_1 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
-
+# Python-scheme
 params = ang_slv.parameters()
-P_load_sch = main_scheme(110, 125, 57, params, 'MOSCOW UNIV.')
+P_load_sch = main_scheme(1, 10, 57, params, 'MOSCOW UNIV.')
 
 now_date = str(datetime.time(datetime.now()))
 now_date_2 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
@@ -164,7 +164,7 @@ print('Trnsys time: ', (now_date_1 - now_date_0), 'Python-scheme time: ', (now_d
 
 
 result = open('Result_file_scheme_and_trnsys.txt', 'w') 
-result.write('NASA_sch' + '\t' + 'WRDC_sch' + '\t' + 'NASA_trns' + '\t' + 'WRDC_trns' + '\n')
+result.write('N_sch' + '\t' + 'W_sch' + '\t' + 'N_trns' + '\t' + 'W_trns' + '\n')
 print(P_load_sch)
 for i in range(1000):
     result.write(str(P_load_sch['NASA'][i]) + '\t' + str(P_load_sch['WRDC'][i]) + '\t' + str(P_load_trns_nasa[i]) + '\t' + str(P_load_trns_wrdc[i]) + '\n')
