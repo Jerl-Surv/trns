@@ -5,6 +5,7 @@ import numpy as np
 from datetime import datetime, date, time
 import os
 from scipy.optimize import minimize
+from scipy.interpolate import UnivariateSpline
 
 def data_for_station(station_name):
     #Staton name: [latitude, longitude]
@@ -31,56 +32,104 @@ def controler_simple(P_load_max, P_pv, Q_acb):
     E_in_bat_NASA = [Q_acb for i in range(len(P_pv['NASA']) + 1)]
     E_in_bat_WRDC = [Q_acb for i in range(len(P_pv['WRDC']) + 1)]
     P_load = P_pv
+    
+    # NASA
+    P_bat_wanted = [(P_pv['NASA'][i] - P_load_max) for i in range(len(P_pv['NASA']))]
+    
+    result = open('P_wanted_from_bat_NASA_data.txt', 'w') 
+    result.write('P_w_N' + '\n')
+    for i in range(100):
+        result.write(str(P_bat_wanted[i]) + '\n')    
+    
+    result.close()
+    
+    P_from_bat = -1*np.array(battery_simple(Q_acb, P_bat_wanted))
+    
+    print(np.shape(P_from_bat))
+        
     for i in range(len(P_pv['NASA'])): 
-        # NASA
+        print(P_pv['NASA'][i], P_from_bat[i])
         if (P_load_max <= P_pv['NASA'][i]):
-            P_bat = P_pv['NASA'][i] - P_load_max
             P_load['NASA'][i] = P_load_max
-            E_in_bat_NASA[i+1] = battery_simple.input_energy(Q_acb, P_bat, E_in_bat_NASA[i])
         else:
-            P_bat = P_load_max - P_pv['NASA'][i]
-            E_in_bat_NASA[i+1] = battery_simple.output_energy(Q_acb, P_bat, E_in_bat_NASA[i-1])
-            P_from_bat = E_in_bat_NASA[i+1]/dt
-            P_load['NASA'][i] = round(min(P_pv['NASA'][i] + P_from_bat, P_load_max), 2)
-        # WRDC
+            P_from_bat = P_from_bat[i][0]
+            P_load['NASA'][i] = min(P_pv['NASA'][i] + P_from_bat[i][0], P_load_max)
+            
+    # WRDC
+    P_bat_wanted = [(P_pv['WRDC'][i] - P_load_max) for i in range(len(P_pv['WRDC']))]
+    P_from_bat = - battery_simple(Q_acb, P_bat_wanted)
+                
+    for i in range(len(P_pv['WRDC'])):        
         if (P_load_max <= P_pv['WRDC'][i]):
-            P_bat = P_pv['WRDC'][i] - P_load_max
             P_load['WRDC'][i] = P_load_max
-            E_in_bat_WRDC[i+1] = battery_simple.input_energy(Q_acb, P_bat, E_in_bat_WRDC[i-1])
         else:
-            P_bat = P_load_max - P_pv['WRDC'][i]
-            E_in_bat_WRDC[i+1] = battery_simple.output_energy(Q_acb, P_bat, E_in_bat_WRDC[i-1])
-            P_from_bat = E_in_bat_WRDC[i+1]/dt
-            P_load['WRDC'][i] = round(min(P_pv['WRDC'][i] + P_from_bat, P_load_max), 2)
+            P_from_bat = P_from_bat[i]
+            P_load['WRDC'][i] = min(P_pv['WRDC'][i] + P_from_bat, P_load_max) 
+
     return P_load
+
+def P_in_bat(E, t, P_w, Q_acb):    
+    if (int(t) != 0):
+        t_spl = [int(t) - 1, int(t), int(t) + 1]
+        P_w_spl = [P_w[int(t) - 1], P_w[int(t)], P_w[int(t) + 1]]
+    else:
+        t_spl = [int(t), int(t) + 1, int(t) + 2]
+        P_w_spl = [P_w[int(t)], P_w[int(t) + 1], P_w[int(t) + 2]]            
     
-class battery_simple:
-    '''
-    def P_generator(E_in_last_P_bat, t, P_bat):
-        return P_bat
+    if (P_w_spl[0] == P_w_spl[1] == P_w_spl[2]):
+        smooth_param = 1
+    else:
+        smooth_param = 2
+    spl = UnivariateSpline(t_spl, P_w_spl, k = smooth_param)
+    P = spl(t)  
+    return P
     
-    def input_energy(Q_acb, P_bat, E_in_last):
-        # решаем диффур dE/dt = P, находим E_in_bat[i]; dt = 1, P = P_bat (поступающая в батарею мощность на шаге)
-        print('E_in_last in: ', E_in_last)
-        E_in_cur = odeint(battery_simple.P_generator, E_in_last, t = [0], args = (P_bat,))
-        return max(Q_acb, E_in_cur)
+def battery_simple(Q_ac, P_w):
+    n = len(P_w)
+    P_w = np.array(list(P_w) + [0])
+    t_arr = [i for i in range(n)]
     
-    def output_energy(Q_acb, P_bat, E_in_last):
-        print('E_in_last out: ', E_in_last)
-        E_in_cur = odeint(battery_simple.P_generator, E_in_last, t = [0], args = (-P_bat,))
-        return max(0, E_in_cur)
-    '''
+    chunck_size = 200
+    iterations = int(n*0.005)
+    last_chunck = n - iterations*chunck_size
+    P_from_bat = [[] for i in range(iterations + 1)]
+    print('First time of derivative computation\n')
     
-    def input_energy(Q_acb, P_bat, E_in_last):
-        # решаем диффур dE/dt = P, находим E_in_bat[i]; dt = 1, P = P_bat (поступающая в батарею мощность на шаге)
-        # интегрируем уравнение методом прямоугольников
-        E_in_cur = E_in_last + P_bat
-        return max(Q_acb, E_in_cur)
+    for chunck in range(iterations + 1):
+        if (chunck != iterations):
+            array_size = chunck_size
+        else:
+            array_size = last_chunck
+            
+        P_w_chunck = np.array(list(P_w[array_size*chunck:array_size*(chunck+1)]) + 2*n*[0])
+        t_arr_chunck = np.array(list(t_arr[array_size*chunck:array_size*(chunck+1)]))
+        E_in_bat_chunck = np.ravel(odeint(P_in_bat, Q_ac, t_arr_chunck, args = (P_w_chunck, Q_ac,))) 
+        #print('Sizes: ' + str(len(P_w_chunck) - 2*n) + str(len(t_arr_chunck)) + str(len(E_in_bat_chunck)) + '\n')
+        #print(P_w_chunck[:20], t_arr_chunck[:20], E_in_bat_chunck[:20])
+        
+        for i in range(array_size):
+            if (E_in_bat_chunck[i] < 0):
+                #print('Less 0, just ' + str(i) + ' \n')
+                E_in_bat_chunck = np.hsplit(E_in_bat_chunck, (i,))
+                P_w_cash = np.hsplit(P_w_chunck, (i,))[1]
+                #t_cash = np.array([(i + j) for j in range(n - i)])
+                t_cash = np.hsplit(t_arr_chunck, (i,))[1]
+                E_in_bat_cash = np.ravel(odeint(P_in_bat, 0, t_cash, args = (P_w_cash, Q_ac,)))
+                E_in_bat_chunck = np.array( list(E_in_bat_chunck[0]) + list(E_in_bat_cash) )           
+         
+            if (E_in_bat_chunck[i] > Q_ac):
+                #print('More max, just ' + str(i) + '\n')
+                E_in_bat_chunck = np.hsplit(E_in_bat_chunck, (i,))
+                P_w_cash = np.hsplit(P_w, (i,))[1]
+                t_cash = np.hsplit(t_arr_chunck, (i,))[1]
+                E_in_bat_cash = np.ravel(odeint(P_in_bat, Q_ac, t_cash, args = (P_w_cash, Q_ac,)))
+                E_in_bat_chunck = np.array( list(E_in_bat_chunck[0]) + list(E_in_bat_cash) ) 
+                
+            if (i != 0):
+                P_from_bat[chunck].append(E_in_bat_chunck[i] - E_in_bat_chunck[i-1])
+        #print(P_from_bat[chunck])
     
-    def output_energy(Q_acb, P_bat, E_in_last):
-        E_in_cur = E_in_last - P_bat
-        return max(0, E_in_cur)
-   
+    return np.ravel(np.array(P_from_bat))  
 
 def read_data():
     nasa_data = pd.read_csv('data_sum_r_NASA.txt', sep='\t', encoding='latin1')
@@ -107,13 +156,17 @@ def P_pv_min_scheme(P_load_max, angle, params, station_name):
              
 def main_scheme(P_pv_max, Q_acb, angle, params, station_name):
     radiation = {}
+    f_step = {}
     dt = 1 # данные с шагом в 1 час
     P_load_max = 1 # Вт, пиковая мощность нагрузки
     nasa_and_wrdc_data = read_data()/3.6 # два столбца: 'NASA' и 'WRDC', сырые данные по радиации из баз данных, в Вт/м^2
+    print('Reading data is completed\n')
     # t_array = [i for i in range(len(nasa_and_wrdc_data['NASA']))]
     radiation['NASA'] = ang_slv.sum_radiation(nasa_and_wrdc_data['NASA'], angle, data_for_station(station_name)) #столбец 'NASA'; пересчитанные данные с горизонтали на угол
     radiation['WRDC'] = ang_slv.sum_radiation(nasa_and_wrdc_data['WRDC'], angle, data_for_station(station_name)) #столбец 'WRDC'; пересчитанные данные с горизонтали на угол
+    print('Computation from gorisontal is completed\n')
     P_pv = pv_simple(P_pv_max, radiation) # два столбца: 'NASA' и 'WRDC'; выходная мощность с фэп
+    print('Computation power from pv is completed\n')
     P_load = controler_simple(P_load_max, P_pv, Q_acb) # два столбца: 'NASA' и 'WRDC'; мощность, поступающая на нагрузку
     print(P_load)
     return P_load
@@ -144,18 +197,21 @@ def find_P_load(P_pv, Q_acb, angle, data_base):
     
     return fixed_df['Power']
 
-
-now_date = str(datetime.time(datetime.now()))
-now_date_0 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
+#now_date_0 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
 # TRNSYS
-P_load_trns_nasa = find_P_load(1, 2, 57, 'NASA')
-P_load_trns_wrdc = find_P_load(1, 2, 57, 'WRDC')
+#P_load_trns_nasa = find_P_load(300, 180*3.6, 57, 'NASA')
+#P_load_trns_wrdc = find_P_load(300, 180*3.6, 57, 'WRDC')
 
-now_date = str(datetime.time(datetime.now()))
-now_date_1 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
+#now_date = str(datetime.time(datetime.now()))
+#now_date_1 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
 # Python-scheme
+
+a = np.array([[1, 1, 1], [1, 1, 1]])
+print(np.shape(a))
+
+
 params = ang_slv.parameters()
-P_load_sch = main_scheme(1, 10, 57, params, 'MOSCOW UNIV.')
+P_load_sch = main_scheme(300, 180, 57, params, 'MOSCOW UNIV.')
 
 now_date = str(datetime.time(datetime.now()))
 now_date_2 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
@@ -164,8 +220,12 @@ print('Trnsys time: ', (now_date_1 - now_date_0), 'Python-scheme time: ', (now_d
 
 
 result = open('Result_file_scheme_and_trnsys.txt', 'w') 
-result.write('N_sch' + '\t' + 'W_sch' + '\t' + 'N_trns' + '\t' + 'W_trns' + '\n')
+result.write('N_d' + '\t' + 'W_d' + '\t' + 'N_sch' + '\t' + 'W_sch' + '\t' + 'N_trns' + '\t' + 'W_trns' + '\n')
 print(P_load_sch)
-for i in range(1000):
-    result.write(str(P_load_sch['NASA'][i]) + '\t' + str(P_load_sch['WRDC'][i]) + '\t' + str(P_load_trns_nasa[i]) + '\t' + str(P_load_trns_wrdc[i]) + '\n')
+for i in range(500):
+    result.write(str(read_data()['NASA'][i])+ '\t' + str(read_data()['WRDC'][i]) + '\t' + 
+                 str(P_load_sch['NASA'][i]) + '\t' + str(P_load_sch['WRDC'][i]) + '\t' + 
+                 str(P_load_trns_nasa[i]) + '\t' + str(P_load_trns_wrdc[i]) + '\n')
 result.close()
+
+
