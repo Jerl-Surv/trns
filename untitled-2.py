@@ -34,41 +34,31 @@ def controler_simple(P_load_max, P_pv, Q_acb):
     P_load = P_pv
     
     # NASA
-    P_bat_wanted = [(P_pv['NASA'][i] - P_load_max) for i in range(len(P_pv['NASA']))]
-    
-    result = open('P_wanted_from_bat_NASA_data.txt', 'w') 
-    result.write('P_w_N' + '\n')
-    for i in range(100):
-        result.write(str(P_bat_wanted[i]) + '\n')    
-    
-    result.close()
-    
-    P_from_bat = -1*np.array(battery_simple(Q_acb, P_bat_wanted))
-    
-    print(np.shape(P_from_bat))
+    P_bat_wanted = [(P_pv['NASA'][i] - P_load_max) for i in range(len(P_pv['NASA']))]   
+    P_from_bat = np.array(battery_simple(Q_acb, P_bat_wanted))
+    print(len(P_bat_wanted), len(P_from_bat))
         
     for i in range(len(P_pv['NASA'])): 
-        print(P_pv['NASA'][i], P_from_bat[i])
+        #print(P_pv['NASA'][i], P_from_bat[i])
         if (P_load_max <= P_pv['NASA'][i]):
             P_load['NASA'][i] = P_load_max
         else:
-            P_from_bat = P_from_bat[i][0]
-            P_load['NASA'][i] = min(P_pv['NASA'][i] + P_from_bat[i][0], P_load_max)
+            P_load['NASA'][i] = min(P_pv['NASA'][i] + P_from_bat[i], P_load_max)
             
     # WRDC
     P_bat_wanted = [(P_pv['WRDC'][i] - P_load_max) for i in range(len(P_pv['WRDC']))]
-    P_from_bat = - battery_simple(Q_acb, P_bat_wanted)
+    P_from_bat = np.array(battery_simple(Q_acb, P_bat_wanted))
+    print(len(P_bat_wanted), len(P_from_bat))
                 
     for i in range(len(P_pv['WRDC'])):        
         if (P_load_max <= P_pv['WRDC'][i]):
             P_load['WRDC'][i] = P_load_max
         else:
-            P_from_bat = P_from_bat[i]
-            P_load['WRDC'][i] = min(P_pv['WRDC'][i] + P_from_bat, P_load_max) 
+            P_load['WRDC'][i] = min(P_pv['WRDC'][i] + P_from_bat[i], P_load_max)
 
     return P_load
 
-def P_in_bat(E, t, P_w, Q_acb):    
+def P_in_bat(E, t, P_w):    
     if (int(t) != 0):
         t_spl = [int(t) - 1, int(t), int(t) + 1]
         P_w_spl = [P_w[int(t) - 1], P_w[int(t)], P_w[int(t) + 1]]
@@ -89,47 +79,55 @@ def battery_simple(Q_ac, P_w):
     P_w = np.array(list(P_w) + [0])
     t_arr = [i for i in range(n)]
     
-    chunck_size = 200
-    iterations = int(n*0.005)
+    chunck_size = 500
+    iterations = int(n/chunck_size)
     last_chunck = n - iterations*chunck_size
-    P_from_bat = [[] for i in range(iterations + 1)]
+    P_from_bat = []
     print('First time of derivative computation\n')
+    E_in_bat = []
     
     for chunck in range(iterations + 1):
+        #print('Chunck #' + str(chunck))
         if (chunck != iterations):
             array_size = chunck_size
         else:
             array_size = last_chunck
             
-        P_w_chunck = np.array(list(P_w[array_size*chunck:array_size*(chunck+1)]) + 2*n*[0])
-        t_arr_chunck = np.array(list(t_arr[array_size*chunck:array_size*(chunck+1)]))
-        E_in_bat_chunck = np.ravel(odeint(P_in_bat, Q_ac, t_arr_chunck, args = (P_w_chunck, Q_ac,))) 
-        #print('Sizes: ' + str(len(P_w_chunck) - 2*n) + str(len(t_arr_chunck)) + str(len(E_in_bat_chunck)) + '\n')
-        #print(P_w_chunck[:20], t_arr_chunck[:20], E_in_bat_chunck[:20])
+        P_w_chunck = np.array(list(P_w[array_size*chunck:array_size*(chunck+1)] + 2) + 2*n*[0])
+        t_arr_chunck = np.array(list(t_arr[array_size*chunck:array_size*(chunck+1) + 1]))
+        E_in_bat_chunck = np.ravel(odeint(P_in_bat, Q_ac, t_arr_chunck, args = (P_w_chunck,)))
+        if (chunck != 0):
+            E_in_bat = list(E_in_bat) + list(np.delete(E_in_bat_chunck, 0))
+        else:
+            E_in_bat = list(E_in_bat) + list(E_in_bat_chunck)
+        #print(len(E_in_bat_chunck), len(E_in_bat), len(P_from_bat))
+        E_in_bat = np.array(E_in_bat)
+        #print(E_in_bat[:10])
         
-        for i in range(array_size):
-            if (E_in_bat_chunck[i] < 0):
+        for i in range(array_size*chunck, array_size*(chunck+1) + 1):
+            #print(i, E_in_bat[i], len(E_in_bat))
+            if (E_in_bat[i] < 0):
                 #print('Less 0, just ' + str(i) + ' \n')
-                E_in_bat_chunck = np.hsplit(E_in_bat_chunck, (i,))
-                P_w_cash = np.hsplit(P_w_chunck, (i,))[1]
-                #t_cash = np.array([(i + j) for j in range(n - i)])
-                t_cash = np.hsplit(t_arr_chunck, (i,))[1]
-                E_in_bat_cash = np.ravel(odeint(P_in_bat, 0, t_cash, args = (P_w_cash, Q_ac,)))
-                E_in_bat_chunck = np.array( list(E_in_bat_chunck[0]) + list(E_in_bat_cash) )           
+                E_in_bat = np.hsplit(E_in_bat, (i,))
+                P_w_cash = np.hsplit(P_w, (i, array_size*(chunck+1) + 2*n))[1]
+                t_cash = np.hsplit(t_arr_chunck, (i, ))[1]
+                E_in_bat_cash = np.ravel(odeint(P_in_bat, 0, t_cash, args = (P_w_cash,)))
+                E_in_bat = np.array( list(E_in_bat[0]) + list(E_in_bat_cash) )           
          
-            if (E_in_bat_chunck[i] > Q_ac):
+            if (E_in_bat[i] > Q_ac):
                 #print('More max, just ' + str(i) + '\n')
-                E_in_bat_chunck = np.hsplit(E_in_bat_chunck, (i,))
-                P_w_cash = np.hsplit(P_w, (i,))[1]
-                t_cash = np.hsplit(t_arr_chunck, (i,))[1]
-                E_in_bat_cash = np.ravel(odeint(P_in_bat, Q_ac, t_cash, args = (P_w_cash, Q_ac,)))
-                E_in_bat_chunck = np.array( list(E_in_bat_chunck[0]) + list(E_in_bat_cash) ) 
+                E_in_bat = np.hsplit(E_in_bat, (i,))
+                P_w_cash = np.hsplit(P_w, (i, array_size*(chunck+1) + 2*n))[1]
+                t_cash = np.hsplit(t_arr_chunck, (i, ))[1]
+                E_in_bat_cash = np.ravel(odeint(P_in_bat, Q_ac, t_cash, args = (P_w_cash,)))
+                E_in_bat = np.array( list(E_in_bat[0]) + list(E_in_bat_cash) ) 
                 
             if (i != 0):
-                P_from_bat[chunck].append(E_in_bat_chunck[i] - E_in_bat_chunck[i-1])
+                P_from_bat.append(E_in_bat[i] - E_in_bat[i-1])
         #print(P_from_bat[chunck])
+    P_from_bat = [(E_in_bat[i-1] - E_in_bat[i]) for i in range(1, n + 1)]
     
-    return np.ravel(np.array(P_from_bat))  
+    return P_from_bat
 
 def read_data():
     nasa_data = pd.read_csv('data_sum_r_NASA.txt', sep='\t', encoding='latin1')
@@ -168,7 +166,6 @@ def main_scheme(P_pv_max, Q_acb, angle, params, station_name):
     P_pv = pv_simple(P_pv_max, radiation) # два столбца: 'NASA' и 'WRDC'; выходная мощность с фэп
     print('Computation power from pv is completed\n')
     P_load = controler_simple(P_load_max, P_pv, Q_acb) # два столбца: 'NASA' и 'WRDC'; мощность, поступающая на нагрузку
-    print(P_load)
     return P_load
 
 def in_file(Q_acb, P_pv_max, angle, data_base):
@@ -197,33 +194,31 @@ def find_P_load(P_pv, Q_acb, angle, data_base):
     
     return fixed_df['Power']
 
-#now_date_0 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
+full_data = read_data()
+
+now_date = str(datetime.time(datetime.now()))
+now_date_0 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
 # TRNSYS
-#P_load_trns_nasa = find_P_load(300, 180*3.6, 57, 'NASA')
-#P_load_trns_wrdc = find_P_load(300, 180*3.6, 57, 'WRDC')
+P_load_trns_nasa = find_P_load(15, 10*3.6, 57, 'NASA')
+P_load_trns_wrdc = find_P_load(15, 10*3.6, 57, 'WRDC')
 
-#now_date = str(datetime.time(datetime.now()))
-#now_date_1 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
+now_date = str(datetime.time(datetime.now()))
+now_date_1 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
+
 # Python-scheme
-
-a = np.array([[1, 1, 1], [1, 1, 1]])
-print(np.shape(a))
-
-
 params = ang_slv.parameters()
-P_load_sch = main_scheme(300, 180, 57, params, 'MOSCOW UNIV.')
+P_load_sch = main_scheme(15, 10, 57, params, 'MOSCOW UNIV.')
 
 now_date = str(datetime.time(datetime.now()))
 now_date_2 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
 
 print('Trnsys time: ', (now_date_1 - now_date_0), 'Python-scheme time: ', (now_date_2 - now_date_1))
 
-
-result = open('Result_file_scheme_and_trnsys.txt', 'w') 
+result = open('Result_file_scheme_and_trnsys_derivatives.txt', 'w') 
 result.write('N_d' + '\t' + 'W_d' + '\t' + 'N_sch' + '\t' + 'W_sch' + '\t' + 'N_trns' + '\t' + 'W_trns' + '\n')
 print(P_load_sch)
 for i in range(500):
-    result.write(str(read_data()['NASA'][i])+ '\t' + str(read_data()['WRDC'][i]) + '\t' + 
+    result.write(str(full_data['NASA'][i])+ '\t' + str(full_data['WRDC'][i]) + '\t' + 
                  str(P_load_sch['NASA'][i]) + '\t' + str(P_load_sch['WRDC'][i]) + '\t' + 
                  str(P_load_trns_nasa[i]) + '\t' + str(P_load_trns_wrdc[i]) + '\n')
 result.close()
