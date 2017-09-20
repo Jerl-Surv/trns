@@ -22,7 +22,7 @@ def parameters():
     return params
 
 def k_t(r_data, years, lattitude, params): # индекс ясности
-    G_sc = 1367 # солнечная постоянная
+    G_sc = 1367 # солнечная постоянная, Вт/м^2
     # phi - широта местности (рад.)
     phi = lattitude*math.pi/180 
     theta_z = np.array([ [( math.cos(phi)*math.cos(params['delta'][i])*math.cos(params['omega'][j]) + math.sin(phi)*math.sin(params['delta'][i]) ) 

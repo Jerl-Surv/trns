@@ -27,7 +27,7 @@ def pv_simple(P_pv_max, radiation):
     P_pv['WRDC'] = radiation_wrdc*P_pv_max/1000
     return P_pv
     
-def controler_simple(P_load_max, P_pv, Q_acb):
+def controler_simple(P_load_max, P_pv, Q_acb, start_sun_day_array):
     dt = 1
     E_in_bat_NASA = [Q_acb for i in range(len(P_pv['NASA']) + 1)]
     E_in_bat_WRDC = [Q_acb for i in range(len(P_pv['WRDC']) + 1)]
@@ -35,7 +35,7 @@ def controler_simple(P_load_max, P_pv, Q_acb):
     
     # NASA
     P_bat_wanted = [(P_pv['NASA'][i] - P_load_max) for i in range(len(P_pv['NASA']))]   
-    P_from_bat = np.array(battery_simple(Q_acb, P_bat_wanted))
+    P_from_bat = np.array(battery_simple(Q_acb, P_bat_wanted, 'NASA', start_sun_day_array))
     print(len(P_bat_wanted), len(P_from_bat))
         
     for i in range(len(P_pv['NASA'])): 
@@ -43,18 +43,18 @@ def controler_simple(P_load_max, P_pv, Q_acb):
         if (P_load_max <= P_pv['NASA'][i]):
             P_load['NASA'][i] = P_load_max
         else:
-            P_load['NASA'][i] = min(P_pv['NASA'][i] + P_from_bat[i], P_load_max)
+            P_load['NASA'][i] = max(0, min(P_pv['NASA'][i] + P_from_bat[i], P_load_max))
             
     # WRDC
     P_bat_wanted = [(P_pv['WRDC'][i] - P_load_max) for i in range(len(P_pv['WRDC']))]
-    P_from_bat = np.array(battery_simple(Q_acb, P_bat_wanted))
+    P_from_bat = np.array(battery_simple(Q_acb, P_bat_wanted, 'WRDC', start_sun_day_array))
     print(len(P_bat_wanted), len(P_from_bat))
                 
     for i in range(len(P_pv['WRDC'])):        
         if (P_load_max <= P_pv['WRDC'][i]):
             P_load['WRDC'][i] = P_load_max
         else:
-            P_load['WRDC'][i] = min(P_pv['WRDC'][i] + P_from_bat[i], P_load_max)
+            P_load['WRDC'][i] = max(0, min(P_pv['WRDC'][i] + P_from_bat[i], P_load_max))
 
     return P_load
 
@@ -74,12 +74,12 @@ def P_in_bat(E, t, P_w):
     P = spl(t)  
     return P
     
-def battery_simple(Q_ac, P_w):
+def battery_simple(Q_ac, P_w, data_base, start_sun_day_array):
     n = len(P_w)
     P_w = np.array(list(P_w) + [0])
     t_arr = [i for i in range(n)]
     
-    chunck_size = 500
+    chunck_size = 600
     iterations = int(n/chunck_size)
     last_chunck = n - iterations*chunck_size
     P_from_bat = []
@@ -109,6 +109,11 @@ def battery_simple(Q_ac, P_w):
             if (E_in_bat[i] < 0):
                 #print('Less 0, just ' + str(i) + ' \n')
                 E_in_bat = np.hsplit(E_in_bat, (i,))
+                # обнуление P_w до начала светового дня
+                hour = i
+                while (P_w[hour] < 0):
+                    P_w[hour] = 0.0
+                    hour += 1             
                 P_w_cash = np.hsplit(P_w, (i, array_size*(chunck+1) + 2*n))[1]
                 t_cash = np.hsplit(t_arr_chunck, (i, ))[1]
                 E_in_bat_cash = np.ravel(odeint(P_in_bat, 0, t_cash, args = (P_w_cash,)))
@@ -117,6 +122,11 @@ def battery_simple(Q_ac, P_w):
             if (E_in_bat[i] > Q_ac):
                 #print('More max, just ' + str(i) + '\n')
                 E_in_bat = np.hsplit(E_in_bat, (i,))
+                # обнуление P_w до того момента, пока нам не понабовится снабжать нагрузку от акб
+                hour = i
+                while (P_w[hour] > 0):
+                    P_w[hour] = 0.0
+                    hour += 1                
                 P_w_cash = np.hsplit(P_w, (i, array_size*(chunck+1) + 2*n))[1]
                 t_cash = np.hsplit(t_arr_chunck, (i, ))[1]
                 E_in_bat_cash = np.ravel(odeint(P_in_bat, Q_ac, t_cash, args = (P_w_cash,)))
@@ -127,7 +137,7 @@ def battery_simple(Q_ac, P_w):
         #print(P_from_bat[chunck])
     P_from_bat = [(E_in_bat[i-1] - E_in_bat[i]) for i in range(1, n + 1)]
     
-    return P_from_bat
+    return [1.0] + P_from_bat[1:]
 
 def read_data():
     nasa_data = pd.read_csv('data_sum_r_NASA.txt', sep='\t', encoding='latin1')
@@ -158,6 +168,14 @@ def main_scheme(P_pv_max, Q_acb, angle, params, station_name):
     dt = 1 # данные с шагом в 1 час
     P_load_max = 1 # Вт, пиковая мощность нагрузки
     nasa_and_wrdc_data = read_data()/3.6 # два столбца: 'NASA' и 'WRDC', сырые данные по радиации из баз данных, в Вт/м^2
+    start_sun_day_array = {}
+    start_sun_day_array = {}
+    start_sun_day_array['NASA'], start_sun_day_array['WRDC'] = [], []
+    for i in range(1, len(nasa_and_wrdc_data['NASA'])):
+        if (nasa_and_wrdc_data['NASA'][i] > 0 and nasa_and_wrdc_data['NASA'][i-1] == 0):
+            start_sun_day_array['NASA'].append(i)
+        if (nasa_and_wrdc_data['WRDC'][i] > 0 and nasa_and_wrdc_data['WRDC'][i-1] == 0):
+            start_sun_day_array['WRDC'].append(i)    
     print('Reading data is completed\n')
     # t_array = [i for i in range(len(nasa_and_wrdc_data['NASA']))]
     radiation['NASA'] = ang_slv.sum_radiation(nasa_and_wrdc_data['NASA'], angle, data_for_station(station_name)) #столбец 'NASA'; пересчитанные данные с горизонтали на угол
@@ -165,7 +183,7 @@ def main_scheme(P_pv_max, Q_acb, angle, params, station_name):
     print('Computation from gorisontal is completed\n')
     P_pv = pv_simple(P_pv_max, radiation) # два столбца: 'NASA' и 'WRDC'; выходная мощность с фэп
     print('Computation power from pv is completed\n')
-    P_load = controler_simple(P_load_max, P_pv, Q_acb) # два столбца: 'NASA' и 'WRDC'; мощность, поступающая на нагрузку
+    P_load = controler_simple(P_load_max, P_pv, Q_acb, start_sun_day_array) # два столбца: 'NASA' и 'WRDC'; мощность, поступающая на нагрузку
     return P_load
 
 def in_file(Q_acb, P_pv_max, angle, data_base):
@@ -199,8 +217,11 @@ full_data = read_data()
 now_date = str(datetime.time(datetime.now()))
 now_date_0 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
 # TRNSYS
-P_load_trns_nasa = find_P_load(15, 10*3.6, 57, 'NASA')
-P_load_trns_wrdc = find_P_load(15, 10*3.6, 57, 'WRDC')
+#P_load_trns_nasa = find_P_load(15, 10*3.6, 57, 'NASA')
+#P_load_trns_wrdc = find_P_load(15, 10*3.6, 57, 'WRDC')
+P_load_trns_nasa = find_P_load(15, 10, 57, 'NASA')
+P_load_trns_wrdc = find_P_load(15, 10, 57, 'WRDC')
+
 
 now_date = str(datetime.time(datetime.now()))
 now_date_1 = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
@@ -217,10 +238,11 @@ print('Trnsys time: ', (now_date_1 - now_date_0), 'Python-scheme time: ', (now_d
 result = open('Result_file_scheme_and_trnsys_derivatives.txt', 'w') 
 result.write('N_d' + '\t' + 'W_d' + '\t' + 'N_sch' + '\t' + 'W_sch' + '\t' + 'N_trns' + '\t' + 'W_trns' + '\n')
 print(P_load_sch)
-for i in range(500):
+for i in range(8760):
     result.write(str(full_data['NASA'][i])+ '\t' + str(full_data['WRDC'][i]) + '\t' + 
                  str(P_load_sch['NASA'][i]) + '\t' + str(P_load_sch['WRDC'][i]) + '\t' + 
                  str(P_load_trns_nasa[i]) + '\t' + str(P_load_trns_wrdc[i]) + '\n')
 result.close()
+print('Finish!')
 
 
