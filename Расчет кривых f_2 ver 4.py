@@ -100,15 +100,15 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
             print('\n')
             P_pv_arr[j][i] = ( (0.999 + 0.001*i)*P_pv_min*f_wanted[j] )
             
-            result = open('Result_file_for_f_0_' + str(f_wanted[j]*1000) + '.txt', 'a')
-            
-            angle_in = angle_for_Q_min(f_wanted[j], 'NASA', P_pv_arr[j][i], Q_start_nasa[j][i], 57)
+            result = open('Result_file_for_f_0_' + str(f_wanted[j]*1000) + '.txt', 'a') 
+            # NASA
+            angle_in = angle_for_Q_min(f_wanted[j], 'NASA', P_pv_arr[j][i], (1-i*0.03)*Q_start_nasa[j][i], 57)
                 
             Q_arr_nasa[j][i] = angle_in[1]
             Q_start_nasa[j][i+1] = angle_in[1]
             print('Result NASA: ', angle_in[0], angle_in[1])             
-                    
-            angle_in = angle_for_Q_min(f_wanted[j], 'WRDC', P_pv_arr[j][i], Q_start_wrdc[j][i], 57)           
+            # WRDC       
+            angle_in = angle_for_Q_min(f_wanted[j], 'WRDC', P_pv_arr[j][i], (1-i*0.03)*Q_start_wrdc[j][i], 57)           
             
             Q_arr_wrdc[j][i] = angle_in[1]
             Q_start_wrdc[j][i+1] = angle_in[1] 
@@ -136,12 +136,12 @@ def min_Q(Q, angle, P_pv, data_base, f_wanted):
 
 def main():
     print('Start')
-    Q = 130 #емкость аккумулятора в кДж
+    Q = 70 #емкость аккумулятора в кДж
     #f_wanted = [0.999, 0.995, 0.99, 0.95]
     f_wanted = [0.999]
     number_of_lines = 10
     number_of_columns = 10
-    dots_number = 5
+    dots_number = 2
     
     os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project5.dck /h')
     P_pv_min = find_P_pv_min()  
@@ -161,6 +161,7 @@ main()
 #res = minimize(delta_f, x_y, method = 'SLSQP', bounds = ((-20, 5), (-3, 20)), options={'ftol': 0.02, 'disp': True, 'maxiter': 15})
 
 #print(res.x)
+
 
 
 
