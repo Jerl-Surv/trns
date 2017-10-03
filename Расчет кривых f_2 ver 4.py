@@ -5,6 +5,8 @@ import pandas as pd
 import numpy as np
 from scipy.optimize import minimize
 
+from datetime import datetime, date, time
+
 def in_file(Q_acb, P_pv_max, angle, data_base):
     param_file_name = 'Param_Project2_for_' + data_base + '.txt'
     f = open(param_file_name, 'w')
@@ -62,10 +64,14 @@ def angle_for_Q_min(f_wanted, data_base, P_pv, Q_start, angle):
     angle_up = angle + 20
     Q_min_find = lambda angle_in: Q_finder(angle_in, data_base = data_base, Q_start = Q_start, P_pv = P_pv, f_wanted = f_wanted)
     print(angle)
-    # bounds = ((angle_down, angle_up),)
-    res = minimize(Q_min_find, angle, method = 'Nelder-Mead', options={'disp': True, 'xatol': 0.5, 'maxiter': 5})
+    now_date = str(datetime.time(datetime.now()))
+    start_time = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])    
+    res = minimize(Q_min_find, angle, method = 'COBYLA', options={'disp': True, 'maxiter': 5})
+    now_date = str(datetime.time(datetime.now()))
+    COBYLA_time = float(now_date[0:2])*3600 + float(now_date[3:5])*60 + float(now_date[6:])
+    print('COBYLA method\n', 'Result: ', res.x, res.fun, 'Time: ', COBYLA_time - start_time)
+    
     return [res.x, res.fun]
-
 
 def Q_finder(angle_in, data_base, Q_start, P_pv, f_wanted):
     res = find_min(angle_in[0], Q_start, P_pv, data_base, f_wanted, 0.0001)           
@@ -98,22 +104,23 @@ def lines_for_different_f(Q, f_wanted, P_pv_min, dots_number):
         for j in range(len(f_wanted)):
             print('f =', f_wanted[j])
             print('\n')
-            P_pv_arr[j][i] = ( (0.999 + 0.001*i)*P_pv_min*f_wanted[j] )
+            P_pv_arr[j][i] = ( (0.9 + 0.02*i)*P_pv_min*f_wanted[j] )
             
             result = open('Result_file_for_f_0_' + str(f_wanted[j]*1000) + '.txt', 'a') 
             # NASA
-            angle_in = angle_for_Q_min(f_wanted[j], 'NASA', P_pv_arr[j][i], (1-i*0.03)*Q_start_nasa[j][i], 57)
+            angle_in = angle_for_Q_min(f_wanted[j], 'NASA', P_pv_arr[j][i], (1-i*0.06)*Q_start_nasa[j][i], 57)
                 
             Q_arr_nasa[j][i] = angle_in[1]
             Q_start_nasa[j][i+1] = angle_in[1]
-            print('Result NASA: ', angle_in[0], angle_in[1])             
+            print('Result NASA: ', angle_in[0], angle_in[1]) 
+
             # WRDC       
             angle_in = angle_for_Q_min(f_wanted[j], 'WRDC', P_pv_arr[j][i], (1-i*0.03)*Q_start_wrdc[j][i], 57)           
             
             Q_arr_wrdc[j][i] = angle_in[1]
             Q_start_wrdc[j][i+1] = angle_in[1] 
             print('Result WRDC: ', angle_in[0], angle_in[1])       
-            
+
             P_pv_arr[j][i] /= 3.6
             Q_arr_nasa[j][i] /= 3.6
             Q_arr_wrdc[j][i] /= 3.6
@@ -141,7 +148,7 @@ def main():
     f_wanted = [0.999]
     number_of_lines = 10
     number_of_columns = 10
-    dots_number = 2
+    dots_number = 6
     
     os.system('C:\Trnsys17\Exe\TRNExe.exe C:\Trnsys17\MyProjects\Project2\Project5.dck /h')
     P_pv_min = find_P_pv_min()  
@@ -150,17 +157,6 @@ def main():
 
 main()
 
-#def f(x, y):
-#    return x**2 + y**2
-
-#def delta_f(x_y):
-#    return abs(f(x_y[0], x_y[1]))
-
-#x_y = [-12, 18]
-
-#res = minimize(delta_f, x_y, method = 'SLSQP', bounds = ((-20, 5), (-3, 20)), options={'ftol': 0.02, 'disp': True, 'maxiter': 15})
-
-#print(res.x)
 
 
 
