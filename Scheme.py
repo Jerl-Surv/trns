@@ -67,7 +67,8 @@ def P_in_bat(E, t, P_w):
     else:
         smooth_param = 2
     spl = UnivariateSpline(t_spl, P_w_spl, k = smooth_param)
-    P = spl(t)  
+    P = spl(t)
+    # добавить условие на перелив    
     return P
     
 def battery_simple(Q_ac, P_w, data_base):
